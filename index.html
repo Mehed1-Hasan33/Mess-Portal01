@@ -1,0 +1,2771 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Mess Management & Audit Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            850: '#151f32',
+                            900: '#0f172a',
+                            950: '#080d1a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <!-- Supabase JS Client Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root { box-sizing: border-box; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+        html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+        body {
+            font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        h1, h2, h3 { overflow-wrap: anywhere; }
+        svg.svg-inline--fa { display: inline-block; height: 1em; width: 1.25em; vertical-align: -0.125em; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col bg-slate-900 text-slate-100 antialiased selection:bg-indigo-500 selection:text-white">
+
+    <header class="bg-slate-850 border-b border-slate-800 relative z-30 shadow-2xl">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div class="flex items-center space-x-3">
+                    <div class="p-2.5 bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-500 rounded-2xl shadow-lg shadow-indigo-500/20">
+                        <i class="fa-solid fa-utensils text-2xl text-white"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
+                            Mess Management <span class="text-indigo-400 font-extrabold">&</span> Audit Portal
+                        </h1>
+                        <p class="text-xs text-slate-400 font-medium flex items-center gap-2">
+                            <span>Automated Daily Meal & Financial Audit Engine</span>
+                            <span class="inline-block w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping"></span>
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between md:justify-end gap-3">
+                    <button id="resetDataBtn" onclick="openResetConfirmModal()" title="Reset all data (Admin only)" class="hidden flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-500/40 rounded-xl text-xs font-semibold transition-all shadow-sm">
+                        <i class="fa-solid fa-rotate-left text-xs"></i>
+                        <span class="hidden sm:inline">Reset Data</span>
+                    </button>
+
+                    <div class="flex items-center gap-2 bg-slate-800/90 p-1.5 rounded-2xl border border-slate-700/80 shadow-inner">
+                        <span class="text-xs font-semibold px-2 text-slate-400">Mode:</span>
+                        <button id="roleToggleBtn" onclick="requestRoleToggle()" class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all duration-300 bg-indigo-600 text-white shadow-md hover:bg-indigo-500">
+                            <span id="roleIconWrap"><i class="fa-solid fa-user"></i></span>
+                            <span id="roleText">User Mode</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="topSummaryBar" class="hidden mt-4 pt-4 border-t border-slate-800/80 transition-all duration-300">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div class="bg-slate-800/90 border border-indigo-500/30 p-3.5 rounded-2xl flex items-center justify-between shadow-lg">
+                        <div>
+                            <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Total Bajar Expenditure</p>
+                            <p class="text-2xl font-black text-indigo-400 mt-0.5" id="statTotalBajar">৳ 0.00</p>
+                        </div>
+                        <div class="p-3 bg-indigo-500/10 text-indigo-400 rounded-xl">
+                            <i class="fa-solid fa-cart-shopping text-xl"></i>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/90 border border-emerald-500/30 p-3.5 rounded-2xl flex items-center justify-between shadow-lg">
+                        <div>
+                            <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Total Meals Eaten</p>
+                            <p class="text-2xl font-black text-emerald-400 mt-0.5" id="statTotalMeals">0.0</p>
+                        </div>
+                        <div class="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl">
+                            <i class="fa-solid fa-bowl-food text-xl"></i>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/90 border border-amber-500/30 p-3.5 rounded-2xl flex items-center justify-between shadow-lg">
+                        <div>
+                            <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Calculated Meal Rate</p>
+                            <p class="text-2xl font-black text-amber-400 mt-0.5" id="statMealRate">৳ 0.00</p>
+                        </div>
+                        <div class="p-3 bg-amber-500/10 text-amber-400 rounded-xl">
+                            <i class="fa-solid fa-calculator text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <nav class="bg-slate-850/95 border-b border-slate-800 sticky top-0 z-40 backdrop-blur-md">
+        <div class="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 flex items-center gap-1.5">
+            <button type="button" id="navArrowLeft" onclick="scrollNav(-1)" title="Scroll tabs left" style="display:none" class="shrink-0 w-9 h-9 items-center justify-center rounded-xl bg-slate-800 border border-slate-600 text-slate-200 hover:bg-indigo-600 hover:text-white transition-all">
+                <i class="fa-solid fa-chevron-left"></i>
+            </button>
+            <div id="navScroller" class="flex flex-grow min-w-0 overflow-x-auto gap-2 py-2.5 no-scrollbar">
+                <button onclick="switchTab('tab1')" id="tabBtn-tab1" class="tab-btn whitespace-nowrap px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all bg-indigo-600 text-white shadow-md">
+                    <i class="fa-solid fa-bowl-rice"></i>
+                    <span>1. Daily Meal Sheet (Today)</span>
+                </button>
+                <button onclick="switchTab('tab2')" id="tabBtn-tab2" class="tab-btn whitespace-nowrap px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all text-slate-400 hover:text-white hover:bg-slate-800">
+                    <i class="fa-solid fa-calendar-days"></i>
+                    <span>2. Calendar & Feedback</span>
+                </button>
+                <button onclick="switchTab('tab3')" id="tabBtn-tab3" class="tab-btn whitespace-nowrap px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all text-slate-400 hover:text-white hover:bg-slate-800">
+                    <i class="fa-solid fa-cart-shopping"></i>
+                    <span>3. Bajar & Extra Sector</span>
+                </button>
+                <button onclick="switchTab('tab4')" id="tabBtn-tab4" class="hidden tab-btn whitespace-nowrap px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all text-slate-400 hover:text-white hover:bg-slate-800">
+                    <i class="fa-solid fa-scale-balanced"></i>
+                    <span>4. Mess Audit & Calculator</span>
+                </button>
+                <button onclick="switchTab('tab5')" id="tabBtn-tab5" class="hidden tab-btn whitespace-nowrap px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all text-slate-400 hover:text-white hover:bg-slate-800">
+                    <i class="fa-solid fa-note-sticky"></i>
+                    <span>5. Notepad</span>
+                </button>
+            </div>
+            <button type="button" id="navArrowRight" onclick="scrollNav(1)" title="Scroll tabs right" style="display:none" class="shrink-0 w-9 h-9 items-center justify-center rounded-xl bg-slate-800 border border-slate-600 text-slate-200 hover:bg-indigo-600 hover:text-white transition-all">
+                <i class="fa-solid fa-chevron-right"></i>
+            </button>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full">
+
+        <!-- TAB 1 -->
+        <section id="tab1" class="tab-content space-y-6">
+            <div class="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 shadow-xl">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="p-3 bg-indigo-500/20 text-indigo-400 rounded-2xl border border-indigo-500/30">
+                            <i class="fa-solid fa-utensils text-2xl"></i>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <h2 class="text-xl font-bold text-white" id="tab1MenuDateFormatted">Loading Date...</h2>
+                                <span id="tab1TodayBadge" class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Today</span>
+                            </div>
+                            <p class="text-xs text-slate-400 mt-0.5 flex items-center gap-2">
+                                <i class="fa-regular fa-clock text-indigo-400"></i>
+                                <span id="liveClockDisplay">Live Time...</span>
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2">
+                        <div class="flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-700">
+                            <i class="fa-solid fa-calendar-day text-indigo-400 text-xs"></i>
+                            <label for="tab1MenuDatePicker" class="text-xs font-semibold text-slate-300 hidden sm:inline">Menu Date:</label>
+                            <input type="date" id="tab1MenuDatePicker" onchange="onTab1MenuDateChange(this.value)" class="bg-slate-800 border border-slate-600 text-white text-xs font-bold rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <button onclick="resetTab1MenuToToday()" title="Jump to Today's Menu" class="p-1 px-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-bold transition-all">
+                                Today
+                            </button>
+                        </div>
+
+                        <div id="adminMenuEditBtn" class="hidden">
+                            <button onclick="openMenuModal()" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md transition-all">
+                                <i class="fa-solid fa-pen-to-square"></i> Edit Menu
+                            </button>
+                        </div>
+
+                        <div id="adminAddMemberBtn" class="hidden">
+                            <button onclick="openAddMemberModal()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md transition-all">
+                                <i class="fa-solid fa-user-plus"></i> Add Member
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 pt-4 border-t border-slate-700/60">
+                    <div class="bg-slate-850 p-3.5 rounded-xl border border-slate-700/50 hover:border-slate-600 transition-all">
+                        <div class="flex items-center gap-2 text-amber-400 text-xs font-bold mb-1">
+                            <i class="fa-solid fa-mug-hot"></i> Breakfast
+                        </div>
+                        <p class="text-sm font-semibold text-slate-200" id="tab1Breakfast">Khichuri & Boiled Egg</p>
+                    </div>
+                    <div class="bg-slate-850 p-3.5 rounded-xl border border-slate-700/50 hover:border-slate-600 transition-all">
+                        <div class="flex items-center gap-2 text-indigo-400 text-xs font-bold mb-1">
+                            <i class="fa-solid fa-bowl-rice"></i> Lunch
+                        </div>
+                        <p class="text-sm font-semibold text-slate-200" id="tab1Lunch">Chicken Curry, Lentils & Steamed Rice</p>
+                    </div>
+                    <div class="bg-slate-850 p-3.5 rounded-xl border border-slate-700/50 hover:border-slate-600 transition-all">
+                        <div class="flex items-center gap-2 text-emerald-400 text-xs font-bold mb-1">
+                            <i class="fa-solid fa-utensils"></i> Dinner
+                        </div>
+                        <p class="text-sm font-semibold text-slate-200" id="tab1Dinner">Fish Fry, Mixed Vegetables & Rice</p>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+                    <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-users text-indigo-400"></i> <span id="mealLogHeading">Mess Members Today Meal Log</span>
+                    </h3>
+                    <span id="roleNoticeBadge" class="text-xs text-slate-400 bg-slate-800 px-3 py-1 rounded-full border border-slate-700 flex items-center gap-1.5">
+                        <i class="fa-solid fa-info-circle text-indigo-400"></i>
+                        <span>Click member photo badge to update avatar</span>
+                    </span>
+                </div>
+
+                <div id="membersTodayGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+            </div>
+
+            <div class="bg-slate-800/90 border border-amber-500/30 rounded-2xl p-5 shadow-xl space-y-5">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-700/80">
+                    <div class="flex items-center gap-3">
+                        <div class="p-3 bg-amber-500/20 text-amber-400 rounded-2xl border border-amber-500/30">
+                            <i class="fa-solid fa-trophy text-2xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-black text-white flex items-center gap-2" id="leaderboardTitle">
+                                🏆 Monthly Leaderboard
+                            </h3>
+                            <p class="text-xs text-slate-400">Ranks members based on meal count for the selected month (Resets automatically every new month)</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-700 shadow-inner">
+                        <i class="fa-solid fa-filter text-amber-400 text-xs"></i>
+                        <label for="leaderboardMonthSelect" class="text-xs font-semibold text-slate-300">Month:</label>
+                        <input type="month" id="leaderboardMonthSelect" onchange="onLeaderboardMonthChange()" style="color-scheme: dark;" class="bg-slate-800 border border-slate-600 text-white text-xs font-bold rounded-lg px-2.5 py-1 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                    </div>
+                </div>
+
+                <div id="championHighlightCard" class="bg-gradient-to-r from-amber-500/10 via-indigo-500/10 to-slate-850 p-4 rounded-2xl border border-amber-500/40 flex flex-col sm:flex-row items-center justify-between gap-4"></div>
+
+                <div id="topBoardContainer" class="space-y-3"></div>
+            </div>
+        </section>
+
+        <!-- TAB 2 -->
+        <section id="tab2" class="tab-content hidden space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-1 space-y-6">
+                    <div class="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 shadow-lg space-y-4">
+                        <h3 class="text-base font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-calendar-days text-indigo-400"></i> Select Inspection Date
+                        </h3>
+                        <div class="space-y-3">
+                            <label class="block text-xs font-semibold text-slate-300">Pick Date:</label>
+                            <input type="date" id="calendarDatePicker" onchange="onCalendarDateChange()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <button onclick="resetCalendarToToday()" class="w-full py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-arrow-rotate-left"></i> Jump to Today
+                            </button>
+                        </div>
+
+                        <div class="mt-5 pt-4 border-t border-slate-700/80 space-y-3">
+                            <h4 class="text-xs font-bold text-indigo-400 uppercase tracking-wider" id="calendarSelectedDateLabel">Date Menu Info</h4>
+                            <div class="space-y-2 text-xs">
+                                <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                                    <span class="text-amber-400 font-bold block mb-0.5"><i class="fa-solid fa-mug-hot"></i> Breakfast:</span>
+                                    <span id="calBreakfast" class="text-slate-300">Standard Breakfast</span>
+                                </div>
+                                <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                                    <span class="text-indigo-400 font-bold block mb-0.5"><i class="fa-solid fa-bowl-rice"></i> Lunch:</span>
+                                    <span id="calLunch" class="text-slate-300">Standard Lunch</span>
+                                </div>
+                                <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                                    <span class="text-emerald-400 font-bold block mb-0.5"><i class="fa-solid fa-utensils"></i> Dinner:</span>
+                                    <span id="calDinner" class="text-slate-300">Standard Dinner</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-2 space-y-6">
+                    <div class="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 shadow-lg space-y-4">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <h3 class="text-base font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-comments text-amber-400"></i> Member Objections & Daily Feedback
+                            </h3>
+                            <span class="text-xs text-slate-400 bg-slate-900 px-3 py-1 rounded-full border border-slate-700" id="objectionCountText">0 Comments</span>
+                        </div>
+
+                        <div class="space-y-3 bg-slate-900/60 p-4 rounded-xl border border-slate-700/60">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-400 mb-1">Member Posting:</label>
+                                    <select id="commentAuthorSelect" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"></select>
+                                </div>
+                                <div class="text-xs text-slate-400 flex items-center px-1">
+                                    Target Date: <span id="commentDateNotice" class="font-bold text-indigo-400 ml-1.5">Today</span>
+                                </div>
+                            </div>
+                            <textarea id="commentTextInput" rows="2" placeholder="Lodge any issue or feedback regarding food quality, missing counts, or timing..." class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"></textarea>
+                            <button onclick="addObjectionComment()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md transition-all">
+                                <i class="fa-solid fa-paper-plane"></i> Post Feedback
+                            </button>
+                        </div>
+
+                        <div id="objectionsList" class="space-y-3 max-h-64 overflow-y-auto pr-1"></div>
+                    </div>
+
+                    <div class="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 shadow-lg space-y-3">
+                        <h3 class="text-base font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-table-cells text-indigo-400"></i> Historical Date-Wise Meal Log Matrix
+                        </h3>
+                                                <p id="matrixRangeNote" class="text-[11px] text-slate-400"></p>
+                        <div class="overflow-x-auto rounded-xl border border-slate-700">
+                            <table class="w-full text-xs text-left text-slate-300">
+                                <thead class="bg-slate-900 text-slate-400 uppercase font-bold text-[10px]">
+                                    <tr id="matrixHeaderRow">
+                                        <th class="p-3">Member</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="matrixBody" class="divide-y divide-slate-700/60"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 3 -->
+        <section id="tab3" class="tab-content hidden space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 space-y-6">
+                    <div id="bajarEntryCard" class="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 shadow-lg space-y-4">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <h3 class="text-base font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-cart-flatbed text-indigo-400"></i> Record Market Bajar Entry
+                            </h3>
+                            <span class="text-xs text-slate-400">Grocery & Fresh Produce Expenditures</span>
+                        </div>
+
+                        <form id="bajarForm" onsubmit="handleAddBajar(event)" class="space-y-4">
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div class="space-y-3">
+                                    <div>
+                                        <label class="block text-[11px] font-semibold text-slate-400 mb-1">Buyer Member</label>
+                                        <select id="bajarBuyerSelect" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"></select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-semibold text-slate-400 mb-1">Date (always today)</label>
+                                        <div id="bajarTodayDate" class="w-full bg-slate-900/60 border border-slate-700 rounded-xl px-3 py-2 text-xs text-indigo-300 font-bold"></div>
+                                    </div>
+                                </div>
+                                <div class="sm:col-span-2">
+                                    <label class="block text-[11px] font-semibold text-slate-400 mb-1">Common Items (tap to add / remove)</label>
+                                    <div id="bajarChips" class="flex flex-wrap gap-1.5"></div>
+                                </div>
+                            </div>
+
+                            <div class="flex gap-2">
+                                <input type="text" id="bajarCustomName" placeholder="Custom item name (in English)" onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomBajarItem();}" class="flex-grow bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <button type="button" onclick="addCustomBajarItem()" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap">
+                                    <i class="fa-solid fa-plus"></i> Add Custom
+                                </button>
+                            </div>
+
+                            <div id="bajarDraftList" class="space-y-2"></div>
+
+                            <div class="flex items-center justify-between gap-3 bg-slate-900 p-3 rounded-xl border border-slate-700/80">
+                                <div>
+                                    <p class="text-[10px] uppercase tracking-wider font-extrabold text-slate-400">Total Amount</p>
+                                    <p class="text-lg font-black text-emerald-400" id="bajarDraftTotal">৳ 0.00</p>
+                                </div>
+                                <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-md transition-all">
+                                    <i class="fa-solid fa-plus"></i> Record Entry
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 shadow-lg space-y-4">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <h3 class="text-base font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-receipt text-emerald-400"></i> Market Bajar Expense Log
+                            </h3>
+                            <span class="text-xs font-extrabold text-indigo-400 bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20" id="bajarCountBadge">0 Records</span>
+                        </div>
+
+                        <div class="overflow-x-auto rounded-xl border border-slate-700">
+                            <table class="w-full text-xs text-left text-slate-300">
+                                <thead class="bg-slate-900 text-slate-400 uppercase font-bold text-[10px]">
+                                    <tr>
+                                        <th class="p-3">Date</th>
+                                        <th class="p-3">Buyer Member</th>
+                                        <th class="p-3">Items Description</th>
+                                        <th class="p-3 text-right">Amount (৳)</th>
+                                        <th class="p-3 text-center">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="bajarTableBody" class="divide-y divide-slate-700/60"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-1 space-y-6">
+                    <div class="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 shadow-lg space-y-4">
+                        <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+                            <h3 class="text-base font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-house-user text-amber-400"></i> Extra Bill
+                            </h3>
+                            <span class="text-[10px] font-bold text-slate-400 uppercase bg-slate-900 px-2.5 py-1 rounded-full border border-slate-700">Equal Split</span>
+                        </div>
+
+                        <div id="extraBillsList" class="space-y-3"></div>
+
+                        <div id="extraBillAddBox" class="hidden bg-slate-900/60 p-3 rounded-xl border border-dashed border-indigo-500/40 space-y-2">
+                            <p class="text-[11px] font-bold text-indigo-400 uppercase tracking-wider">Add New Bill</p>
+                            <input type="text" id="extraNewName" placeholder="Bill name (e.g. Security Guard)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <input type="number" id="extraNewAmount" min="0" placeholder="Amount (৳)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <button type="button" onclick="addExtraBill()" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-md transition-all">
+                                <i class="fa-solid fa-plus"></i> Add Bill
+                            </button>
+                        </div>
+
+                        <div class="bg-slate-900 p-4 rounded-xl border border-slate-700/80 space-y-2 mt-4">
+                            <div class="flex justify-between text-xs text-slate-300">
+                                <span>Total Market Bajar:</span>
+                                <span class="font-bold text-indigo-400" id="statBajarSubtotal">৳ 0.00</span>
+                            </div>
+                            <div class="flex justify-between text-xs text-slate-300">
+                                <span>Total Extra Bills:</span>
+                                <span class="font-bold text-amber-400" id="statExtraSubtotal">৳ 0.00</span>
+                            </div>
+                            <div class="flex justify-between text-xs text-slate-300 border-t border-slate-800 pt-2">
+                                <span class="font-bold text-white">Grand Mess Total:</span>
+                                <span class="font-black text-emerald-400" id="statGrandTotal">৳ 0.00</span>
+                            </div>
+                            <div class="flex justify-between text-xs text-slate-300 pt-1">
+                                <span>Per Head Shared Extra:</span>
+                                <span class="font-extrabold text-amber-300" id="statPerHeadExtra">৳ 0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 4 -->
+        <section id="tab4" class="tab-content hidden space-y-6">
+            <div class="bg-slate-800/90 border border-indigo-500/30 rounded-2xl p-5 shadow-xl space-y-4">
+                <div class="flex items-center gap-3 border-b border-slate-700 pb-3">
+                    <div class="p-3 bg-indigo-500/20 text-indigo-400 rounded-2xl border border-indigo-500/30">
+                        <i class="fa-solid fa-calculator text-2xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-black text-white">Mess Minimum Meal Audit &amp; Settlement</h3>
+                        <p class="text-xs text-slate-400">Change the variables below and every calculation updates automatically</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div class="bg-slate-900 p-3 rounded-xl border border-slate-700">
+                        <label class="block text-[11px] font-semibold text-slate-400 mb-1">Mess Cycle Days (total days)</label>
+                        <input type="number" id="auditCycleDaysInput" value="62" min="1" max="366" onchange="updateAuditSettings()" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-white font-black disabled:opacity-60 disabled:cursor-not-allowed">
+                    </div>
+                    <div class="bg-slate-900 p-3 rounded-xl border border-slate-700">
+                        <label class="block text-[11px] font-semibold text-slate-400 mb-1">Buwa Miss (days)</label>
+                        <input type="number" id="auditBuwaInput" value="5" min="0" max="366" onchange="updateAuditSettings()" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-white font-black disabled:opacity-60 disabled:cursor-not-allowed">
+                    </div>
+                    <div class="bg-slate-900 p-3 rounded-xl border border-slate-700">
+                        <label class="block text-[11px] font-semibold text-slate-400 mb-1">Required Percentage (%)</label>
+                        <input type="number" id="auditPercentInput" value="70" min="0" max="100" step="1" onchange="updateAuditSettings()" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-white font-black disabled:opacity-60 disabled:cursor-not-allowed">
+                    </div>
+                </div>
+                <p id="auditEditNotice" class="text-[11px] text-slate-400"></p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                    <div class="bg-slate-900/80 p-3.5 rounded-xl border border-slate-700/50">
+                        <p class="text-slate-400 font-medium flex items-center gap-1.5"><i class="fa-solid fa-circle-info text-indigo-400"></i> 1. Active Days</p>
+                        <p class="text-slate-200 font-bold mt-1" id="fmActive">Active Days = Cycle Days - Home (Absent) Days</p>
+                    </div>
+                    <div class="bg-slate-900/80 p-3.5 rounded-xl border border-slate-700/50">
+                        <p class="text-slate-400 font-medium flex items-center gap-1.5"><i class="fa-solid fa-bullseye text-amber-400"></i> 2. Percentage Requirement</p>
+                        <p class="text-slate-200 font-bold mt-1" id="fmReq">70% Req = Active Days x 70% (rounded up)</p>
+                    </div>
+                    <div class="bg-slate-900/80 p-3.5 rounded-xl border border-slate-700/50">
+                        <p class="text-slate-400 font-medium flex items-center gap-1.5"><i class="fa-solid fa-scale-balanced text-emerald-400"></i> 3. Minimum Target Meal</p>
+                        <p class="text-indigo-400 font-bold mt-1" id="fmMin">Min Target = 70% Req - Buwa Miss (5)</p>
+                    </div>
+                    <div class="bg-slate-900/80 p-3.5 rounded-xl border border-slate-700/50">
+                        <p class="text-slate-400 font-medium flex items-center gap-1.5"><i class="fa-solid fa-coins text-rose-400"></i> 4. Billing &amp; Meal Rate</p>
+                        <p class="text-slate-200 font-bold mt-1">Below Min Target = billed as Min Target meals. Meal Rate = Total Bajar / Total Billable Meals of all members</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div class="bg-slate-800/90 border border-indigo-500/30 p-3.5 rounded-2xl">
+                    <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Total Bajar</p>
+                    <p class="text-xl font-black text-indigo-400 mt-0.5" id="auditTotalBajar">৳ 0.00</p>
+                </div>
+                <div class="bg-slate-800/90 border border-emerald-500/30 p-3.5 rounded-2xl">
+                    <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Total Billable Meals (all members)</p>
+                    <p class="text-xl font-black text-emerald-400 mt-0.5" id="auditTotalBillable">0</p>
+                </div>
+                <div class="bg-slate-800/90 border border-amber-500/30 p-3.5 rounded-2xl">
+                    <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Meal Rate (Bajar / Billable Meals)</p>
+                    <p class="text-xl font-black text-amber-400 mt-0.5" id="auditMealRate">৳ 0.00</p>
+                </div>
+            </div>
+
+            <div class="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 shadow-lg space-y-4">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h3 class="text-base font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-file-invoice-dollar text-emerald-400"></i> Final Mess Audit &amp; Settlement Balance Ledger
+                    </h3>
+                    <div class="flex items-center gap-2">
+                        <button onclick="downloadAuditPdf()" id="auditPdfBtn" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm transition-all">
+                            <i class="fa-solid fa-file-pdf"></i> Download PDF
+                        </button>
+                        <button onclick="renderAuditLedger()" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm transition-all">
+                            <i class="fa-solid fa-rotate"></i> Recalculate Ledger
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto rounded-xl border border-slate-700">
+                    <table class="w-full text-xs text-left text-slate-300">
+                        <thead class="bg-slate-900 text-slate-400 uppercase font-bold text-[10px]">
+                            <tr>
+                                <th class="p-3">Member</th>
+                                <th class="p-3 text-center">Home (Absent)</th>
+                                <th class="p-3 text-center">Active Days</th>
+                                <th class="p-3 text-center" id="thPercentReq">70% Req.</th>
+                                <th class="p-3 text-center">Buwa Miss</th>
+                                <th class="p-3 text-center">Min. Target</th>
+                                <th class="p-3 text-center">Actual Eaten</th>
+                                <th class="p-3 text-center">Final Status</th>
+                                <th class="p-3 text-center">Billable Meals</th>
+                                <th class="p-3 text-right">Meal Cost (৳)</th>
+                                <th class="p-3 text-right">Extra Share (৳)</th>
+                                <th class="p-3 text-right">Deposit (৳)</th>
+                                <th class="p-3 text-center">Final Balance</th>
+                            </tr>
+                        </thead>
+                        <tbody id="auditLedgerBody" class="divide-y divide-slate-700/60"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 5 -->
+        <section id="tab5" class="tab-content hidden space-y-6">
+            <div class="bg-slate-800/90 border border-amber-500/30 rounded-2xl p-5 shadow-xl">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                        <div class="p-3 bg-amber-500/20 text-amber-400 rounded-2xl border border-amber-500/30">
+                            <i class="fa-solid fa-note-sticky text-2xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-black text-white">Notepad</h3>
+                            <p class="text-xs text-slate-400">Write anything you want to remember. Notes save automatically and are not connected to any meal, bajar or audit data.</p>
+                        </div>
+                    </div>
+                    <button onclick="addNote()" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-md transition-all">
+                        <i class="fa-solid fa-plus"></i> New Note
+                    </button>
+                </div>
+            </div>
+
+            <div id="notesList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+        </section>
+
+    </main>
+
+    <!-- Menu Edit Modal -->
+    <div id="menuModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-utensils text-indigo-400"></i> Edit Food Menu
+                </h3>
+                <button onclick="closeMenuModal()" class="text-slate-400 hover:text-white text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form onsubmit="saveMenuModal(event)" class="space-y-4">
+                <div class="bg-slate-900/90 p-3 rounded-xl border border-indigo-500/30">
+                    <label class="block text-xs font-bold text-indigo-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                        <i class="fa-solid fa-calendar-days"></i> Select Date to View / Edit Menu:
+                    </label>
+                    <input type="date" id="modalMenuDatePicker" onchange="onModalMenuDateChange(this.value)" required class="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <p class="text-[10px] text-slate-400 mt-1">Pick any past, present, or future date. Updating fields automatically sets menu items for that specific day.</p>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1 flex items-center gap-1.5">
+                        <i class="fa-solid fa-mug-hot text-amber-400"></i> Breakfast Menu
+                    </label>
+                    <input type="text" id="modalBreakfastInput" required placeholder="e.g. Khichuri & Boiled Egg" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1 flex items-center gap-1.5">
+                        <i class="fa-solid fa-bowl-rice text-indigo-400"></i> Lunch Menu
+                    </label>
+                    <input type="text" id="modalLunchInput" required placeholder="e.g. Chicken Curry, Lentils & Steamed Rice" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1 flex items-center gap-1.5">
+                        <i class="fa-solid fa-utensils text-emerald-400"></i> Dinner Menu
+                    </label>
+                    <input type="text" id="modalDinnerInput" required placeholder="e.g. Fish Fry, Mixed Vegetables & Rice" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2 border-t border-slate-700/80">
+                    <button type="button" onclick="closeMenuModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold rounded-xl">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md">Save Food Menu</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Member Modal -->
+    <div id="addMemberModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-user-plus text-emerald-400"></i> Add New Mess Member
+                </h3>
+                <button onclick="closeAddMemberModal()" class="text-slate-400 hover:text-white text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form onsubmit="handleAddMemberSubmit(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Member Name</label>
+                    <input type="text" id="addMemberNameInput" placeholder="e.g. Rahul Sen" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Room No.</label>
+                                        <input type="text" id="addMemberRoomInput" placeholder="e.g. Room 304" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Initial Deposit (৳)</label>
+                    <input type="number" id="addMemberDepositInput" min="0" value="4000" step="100" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Initial Absent Days</label>
+                    <input type="number" id="addMemberAbsentInput" min="0" max="62" value="0" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeAddMemberModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold rounded-xl">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md">Add Member</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Deposit Modal -->
+    <div id="depositModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-xs w-full p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+                <h3 class="text-base font-bold text-white" id="depositModalMemberName">Update Deposit</h3>
+                <button onclick="closeDepositModal()" class="text-slate-400 hover:text-white text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="space-y-3">
+                <input type="hidden" id="depositMemberId">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Total Deposit Amount (৳)</label>
+                    <input type="number" id="depositAmountInput" min="0" step="100" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold">
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeDepositModal()" class="px-3 py-2 bg-slate-700 text-slate-200 text-xs font-bold rounded-xl">Cancel</button>
+                    <button type="button" onclick="saveDepositModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md">Update</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Member Confirm Modal -->
+    <div id="deleteMemberModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-slate-800 border border-rose-500/30 rounded-2xl max-w-xs w-full p-6 shadow-2xl space-y-4">
+            <div class="flex items-center gap-3 border-b border-slate-700 pb-3">
+                <div class="p-2.5 bg-rose-500/20 text-rose-400 rounded-xl">
+                    <i class="fa-solid fa-user-minus text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-white">Remove Member?</h3>
+                    <p class="text-xs text-slate-400" id="deleteMemberNameLabel">Confirm deletion</p>
+                </div>
+            </div>
+            <input type="hidden" id="deleteMemberTargetId">
+            <p class="text-xs text-slate-300">Are you sure you want to remove this member? This action cannot be undone.</p>
+            <div class="flex justify-end gap-2 pt-2">
+                <button type="button" onclick="closeDeleteMemberModal()" class="px-4 py-2 bg-slate-700 text-slate-200 text-xs font-bold rounded-xl">Cancel</button>
+                <button type="button" onclick="executeMemberDelete()" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl shadow-md">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reset Confirmation Modal -->
+    <div id="resetConfirmModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-slate-800 border border-rose-500/30 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4">
+            <div class="flex items-center gap-3 border-b border-slate-700 pb-3">
+                <div class="p-2.5 bg-rose-500/20 text-rose-400 rounded-xl">
+                    <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-white">Reset Application State?</h3>
+                    <p class="text-xs text-slate-400">Restore standard default members and clear custom entries</p>
+                </div>
+            </div>
+
+            <p class="text-xs text-slate-300">This will erase <strong class="text-rose-300">all data</strong>: meal records, bajar records, extra bill amounts, menus, feedback, and all members with their photos, deposits and absent days. Notepad notes stay. After the reset, the Admin can add members again with Add Member. This cannot be undone.</p>
+
+            <div class="space-y-1.5">
+                <label class="block text-xs font-semibold text-slate-300">Enter Admin Password to confirm</label>
+                <input type="password" id="resetPwInput" inputmode="numeric" maxlength="7" autocomplete="off" placeholder="7 digit password" oninput="this.value=this.value.replace(/[^0-9]/g,'')" onkeydown="if(event.key==='Enter'){executeDataReset();}" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-center tracking-[0.5em] text-white font-bold focus:outline-none focus:ring-2 focus:ring-rose-500">
+                <p id="resetPwError" class="text-[11px] text-rose-400 font-semibold min-h-[16px]"></p>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2">
+                <button type="button" onclick="closeResetConfirmModal()" class="px-4 py-2 bg-slate-700 text-slate-200 text-xs font-bold rounded-xl">Cancel</button>
+                <button type="button" onclick="executeDataReset()" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl shadow-md">Reset Now</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Password Modal (login + change password) -->
+    <div id="adminPasswordModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-slate-800 border border-amber-500/30 rounded-2xl max-w-xs w-full p-6 shadow-2xl space-y-4">
+            <div class="flex items-center gap-3 border-b border-slate-700 pb-3">
+                <div class="p-2.5 bg-amber-500/20 text-amber-400 rounded-xl">
+                    <i class="fa-solid fa-lock text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-white" id="pwTitle">Admin Password</h3>
+                    <p class="text-xs text-slate-400" id="pwSubtitle">Enter the 7 digit password</p>
+                </div>
+            </div>
+
+            <div id="pwLoginPanel" class="space-y-2">
+                <input type="password" id="adminPwInput" inputmode="numeric" maxlength="7" autocomplete="off" placeholder="7 digit password" oninput="this.value=this.value.replace(/[^0-9]/g,'')" onkeydown="if(event.key==='Enter'){submitAdminPassword();}" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-center tracking-[0.5em] text-white font-bold focus:outline-none focus:ring-2 focus:ring-amber-500">
+                <p id="adminPwError" class="text-[11px] text-rose-400 font-semibold min-h-[16px]"></p>
+            </div>
+
+            <div id="pwChangePanel" class="hidden space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Old Password</label>
+                    <input type="password" id="curPwInput" inputmode="numeric" maxlength="7" autocomplete="off" placeholder="7 digit old password" oninput="this.value=this.value.replace(/[^0-9]/g,'')" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">New Password</label>
+                    <input type="password" id="newPwInput" inputmode="numeric" maxlength="7" autocomplete="off" placeholder="7 digit new password" oninput="this.value=this.value.replace(/[^0-9]/g,'')" onkeydown="if(event.key==='Enter'){submitChangePassword();}" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <p id="changePwError" class="text-[11px] text-rose-400 font-semibold min-h-[16px]"></p>
+            </div>
+
+            <div class="flex items-center justify-between gap-2">
+                <button type="button" id="pwModeLink" onclick="togglePwMode()" class="text-[11px] font-bold text-indigo-400 hover:underline flex items-center gap-1"><i class="fa-solid fa-key"></i> <span id="pwModeLinkText">Change Password</span></button>
+                <div class="flex gap-2">
+                    <button type="button" onclick="closeAdminPasswordModal()" class="px-4 py-2 bg-slate-700 text-slate-200 text-xs font-bold rounded-xl">Cancel</button>
+                    <button type="button" id="pwPrimaryBtn" onclick="submitPwModal()" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl shadow-md">Enter Admin Mode</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toastNotification" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none flex items-center gap-2.5 px-4 py-3 bg-slate-800 border border-indigo-500/50 text-white text-xs font-bold rounded-2xl shadow-2xl">
+        <span id="toastIconWrap"><i class="fa-solid fa-circle-check text-indigo-400 text-base"></i></span>
+        <span id="toastMessage">Action completed successfully!</span>
+    </div>
+
+    <footer class="bg-slate-850 border-t border-slate-800 py-4 text-center text-xs text-slate-400 mt-auto">
+        <p>Mess Management & Audit Portal &copy; 2026. All Rights Reserved.</p>
+        <p class="mt-1.5">Developed by <span class="font-bold text-indigo-400">Mehed1-Hasan</span></p>
+    </footer>
+
+    <script>
+      // Supabase Credentials
+    const SUPABASE_URL = 'https://bfsbbdtqrsmuddngbtly.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_5TEt-zPywRr0bnZ1ZKbUrg_W2VX0Wrr';
+
+    // Initialize Supabase Client
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // --- Supabase Cloud Storage Functions ---
+
+    // 1. Page load haoyar shomoy Supabase theke data load korar function
+    async function loadFromSupabase() {
+        try {
+            const { data, error } = await supabaseClient
+                .from('mess_data')
+                .select('data')
+                .eq('id', 1)
+                .maybeSingle();
+
+            if (error) {
+                console.error('Supabase load error:', error);
+                return;
+            }
+
+            if (data && data.data) {
+                Object.keys(data.data).forEach(key => {
+                    localStorage.setItem(key, typeof data.data[key] === 'string' ? data.data[key] : JSON.stringify(data.data[key]));
+                });
+            }
+        } catch (err) {
+            console.error('Sync error:', err);
+        }
+    }
+
+    // 2. Data save haoyar shathe shathe Supabase-e pathanor function
+    async function saveToSupabase() {
+        try {
+            const allLocalData = {};
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                allLocalData[k] = localStorage.getItem(k);
+            }
+
+            await supabaseClient
+                .from('mess_data')
+                .upsert({ id: 1, data: allLocalData });
+        } catch (err) {
+            console.error('Supabase save error:', err);
+        }
+    }
+
+// ২. ডাটা সেভ হওয়ার সাথে সাথে সুপাবেসে পাঠানোর ফাংশন
+async function saveToSupabase() {
+    try {
+        const allLocalData = {};
+        for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            allLocalData[k] = localStorage.getItem(k);
+        }
+
+        await supabaseClient
+            .from('mess_data')
+            .upsert({ id: 1, data: allLocalData });
+    } catch (err) {
+        console.error('Supabase save error:', err);
+    }
+}
+// --- Auto-Sync & Debounce Setup ---
+let syncTimer = null;
+
+function triggerAutoSave() {
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => {
+        saveToSupabase();
+    }, 500);
+}
+
+function lsSet(key, val) {
+    localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val));
+    triggerAutoSave();
+}
+        const DEFAULT_MEMBERS = [
+            { id: 'n1', name: 'Fahim Islam Rahat', room: '-', avatar: '', deposit: 0, absentDays: 0 },
+            { id: 'n2', name: 'Md Mehedi Hasan', room: '-', avatar: '', deposit: 0, absentDays: 0 },
+            { id: 'n3', name: 'K.M Shoyab', room: '-', avatar: '', deposit: 0, absentDays: 0 },
+            { id: 'n4', name: 'Abid Abdullah', room: '-', avatar: '', deposit: 0, absentDays: 0 },
+            { id: 'n5', name: 'Jihad Mia', room: '-', avatar: '', deposit: 0, absentDays: 0 },
+            { id: 'n6', name: 'Robiul Islam Robi', room: '-', avatar: '', deposit: 0, absentDays: 0 }
+        ];
+
+        const DEFAULT_EXTRA = {};
+
+        // Safe storage wrappers (storage may be unavailable)
+        function lsGet(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
+        function lsSet(key, val) { 
+    try { 
+        localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val)); 
+        saveToSupabase(); // ক্লাউডে অটো-সেভ হবে
+    } catch (e) {} 
+}
+        function lsClear() { try { localStorage.clear(); } catch (e) {} }
+
+        // Inline SVG placeholder avatar (no remote images)
+        function placeholderAvatar(name) {
+            const letter = (name || '?').charAt(0).toUpperCase().replace(/[<>&"']/g, '?');
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="#334155"/><text x="50" y="50" font-family="Arial, sans-serif" font-size="44" font-weight="bold" fill="#f8fafc" text-anchor="middle" dominant-baseline="central">${letter}</text></svg>`;
+            return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+        }
+
+        function getLocalDateString(d = new Date()) {
+            if (!(d instanceof Date) || isNaN(d.getTime())) d = new Date();
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function getLocalMonthKey(dateString) {
+            if (!dateString || typeof dateString !== 'string') {
+                return getLocalDateString().slice(0, 7);
+            }
+            const parts = dateString.split('-');
+            if (parts.length >= 2 && parts[0].length === 4 && parts[1].length >= 1) {
+                return `${parts[0]}-${parts[1].padStart(2, '0')}`;
+            }
+            return getLocalDateString().slice(0, 7);
+        }
+
+        function getMonthNameFormatted(monthKey) {
+            if (!monthKey || typeof monthKey !== 'string') return '';
+            const parts = monthKey.split('-');
+            if (parts.length < 2) return monthKey;
+            const year = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10);
+            if (isNaN(year) || isNaN(month) || month < 1 || month > 12) return monthKey;
+            const date = new Date(year, month - 1, 1);
+            if (isNaN(date.getTime())) return monthKey;
+            return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        }
+
+        function formatDatePretty(dateString) {
+            if (!dateString || typeof dateString !== 'string') return '';
+            const parts = dateString.split('-');
+            if (parts.length !== 3) return dateString;
+            const year = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10) - 1;
+            const day = parseInt(parts[2], 10);
+            if (isNaN(year) || isNaN(month) || isNaN(day)) return dateString;
+            const date = new Date(year, month, day);
+            if (isNaN(date.getTime())) return dateString;
+            return date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+        }
+
+        let state = {
+            currentRole: 'user',
+            members: [],
+            meals: {},
+            menus: {},
+            bajar: [],
+            extraSectors: {},
+            objections: [],
+            cycleDays: 62,
+            selectedCalendarDate: getLocalDateString(),
+            selectedLeaderboardMonth: getLocalMonthKey(getLocalDateString()),
+            selectedMenuDate: getLocalDateString()
+        };
+
+        function initData() {
+            const todayStr = getLocalDateString();
+
+            const storedMembers = lsGet('mess_members');
+            if (storedMembers) {
+                try { state.members = JSON.parse(storedMembers); } catch(e) { state.members = JSON.parse(JSON.stringify(DEFAULT_MEMBERS)); }
+            } else {
+                state.members = JSON.parse(JSON.stringify(DEFAULT_MEMBERS));
+                saveMembers();
+            }
+
+            const storedExtra = lsGet('mess_extra');
+            if (storedExtra) {
+                try { state.extraSectors = JSON.parse(storedExtra); } catch(e) { state.extraSectors = { ...DEFAULT_EXTRA }; }
+            } else {
+                state.extraSectors = { ...DEFAULT_EXTRA };
+                saveExtraSectorsData();
+            }
+
+            const storedLabels = lsGet('mess_extra_labels');
+            if (storedLabels) {
+                try { state.extraLabels = JSON.parse(storedLabels) || {}; } catch(e) { state.extraLabels = {}; }
+            } else {
+                state.extraLabels = {};
+            }
+
+            const storedMeals = lsGet('mess_meals');
+            if (storedMeals) {
+                try { state.meals = JSON.parse(storedMeals); } catch(e) { state.meals = {}; }
+            } else {
+                state.meals[todayStr] = { 'n1': 2.5, 'n2': 3.0, 'n3': 2.0, 'n4': 1.5, 'n5': 2.0, 'n6': 2.5 };
+                saveMeals();
+            }
+
+            const storedMenus = lsGet('mess_menus');
+            if (storedMenus) {
+                try { state.menus = JSON.parse(storedMenus); } catch(e) { state.menus = {}; }
+            } else {
+                state.menus[todayStr] = {
+                    breakfast: "Khichuri & Boiled Egg",
+                    lunch: "Chicken Curry, Lentils & Steamed Rice",
+                    dinner: "Fish Fry, Mixed Vegetables & Rice"
+                };
+                saveMenus();
+            }
+
+            const storedBajar = lsGet('mess_bajar');
+            if (storedBajar) {
+                try { state.bajar = JSON.parse(storedBajar); } catch(e) { state.bajar = []; }
+            } else {
+                state.bajar = [
+                    { id: 1, date: todayStr, buyerId: 'n1', items: 'Chicken, Rice, Mustard Oil', amount: 1850 },
+                    { id: 2, date: todayStr, buyerId: 'n2', items: 'Fish, Vegetables, Spices', amount: 1420 }
+                ];
+                saveBajarData();
+            }
+
+            const storedObjections = lsGet('mess_objections');
+            if (storedObjections) {
+                try { state.objections = JSON.parse(storedObjections); } catch(e) { state.objections = []; }
+            } else {
+                state.objections = [
+                    { id: 101, date: todayStr, authorId: 'n3', comment: 'Lunch was served hot and on time today.', timestamp: '13:45' }
+                ];
+                saveObjectionsData();
+            }
+
+            // One-time switch to the new member list
+            if (lsGet('mess_members_version') !== '2') {
+                state.members = JSON.parse(JSON.stringify(DEFAULT_MEMBERS));
+                saveMembers();
+                const valid = new Set(state.members.map(m => m.id));
+                Object.keys(state.meals).forEach(d => {
+                    const o = state.meals[d];
+                    if (o && typeof o === 'object') {
+                        Object.keys(o).forEach(id => { if (!valid.has(id)) delete o[id]; });
+                        if (Object.keys(o).length === 0) delete state.meals[d];
+                    }
+                });
+                saveMeals();
+                state.objections = state.objections.filter(o => valid.has(o.authorId));
+                saveObjectionsData();
+                lsSet('mess_members_version', '2');
+            }
+
+            // One-time: make sure Fahim Islam Rahat is in the member list
+            if (lsGet('mess_fahim_added') !== '1') {
+                const exists = state.members.some(m => (m.name || '').trim().toLowerCase() === 'fahim islam rahat');
+                if (!exists) {
+                    const idTaken = state.members.some(m => m.id === 'n1');
+                    state.members.unshift({
+                        id: idTaken ? 'm_' + Date.now() : 'n1',
+                        name: 'Fahim Islam Rahat', room: '-', avatar: '', deposit: 0, absentDays: 0
+                    });
+                    saveMembers();
+                }
+                lsSet('mess_fahim_added', '1');
+            }
+
+            // One-time: remove the old default extra bills (custom bills stay)
+            if (lsGet('mess_extra_custom_only') !== '1') {
+                ['rent', 'gas', 'wifi', 'maid', 'utility'].forEach(k => {
+                    delete state.extraSectors[k];
+                    if (state.extraLabels) delete state.extraLabels[k];
+                                    });
+                saveExtraSectorsData();
+                saveExtraLabelsData();
+                lsSet('mess_extra_custom_only', '1');
+            }
+        }
+
+        function saveMembers() { lsSet('mess_members', JSON.stringify(state.members)); }
+        function saveExtraSectorsData() { lsSet('mess_extra', JSON.stringify(state.extraSectors)); }
+        function saveMeals() { lsSet('mess_meals', JSON.stringify(state.meals)); }
+        function saveMenus() { lsSet('mess_menus', JSON.stringify(state.menus)); }
+        function saveBajarData() { lsSet('mess_bajar', JSON.stringify(state.bajar)); }
+        function saveObjectionsData() { lsSet('mess_objections', JSON.stringify(state.objections)); }
+
+        const DEFAULT_ADMIN_PASSWORD = '1234567';
+
+        async function hashPw(pw) {
+            const salted = 'mess-portal-salt:' + pw;
+            try {
+                if (window.crypto && crypto.subtle) {
+                    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(salted));
+                    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+                }
+            } catch (e) {}
+            let h = 5381;
+            for (let i = 0; i < salted.length; i++) { h = ((h << 5) + h + salted.charCodeAt(i)) | 0; }
+            return 'f' + (h >>> 0).toString(16);
+        }
+
+        async function getStoredPwHash() {
+            const saved = lsGet('mess_admin_pw');
+            return saved ? saved : await hashPw(DEFAULT_ADMIN_PASSWORD);
+        }
+
+        function isValidPw(pw) { return /^[0-9]{7}$/.test(pw); }
+
+        function requestRoleToggle() {
+            if (state.currentRole === 'admin') {
+                toggleRole();
+            } else {
+                openAdminPasswordModal();
+            }
+        }
+
+        let pwMode = 'login';
+
+        function setPwMode(mode) {
+            pwMode = mode;
+            const isLogin = mode === 'login';
+            document.getElementById('pwLoginPanel').classList.toggle('hidden', !isLogin);
+            document.getElementById('pwChangePanel').classList.toggle('hidden', isLogin);
+            document.getElementById('pwTitle').innerText = isLogin ? 'Admin Password' : 'Change Password';
+            document.getElementById('pwSubtitle').innerText = isLogin ? 'Enter the 7 digit password' : 'Enter old password and a new 7 digit password';
+            document.getElementById('pwModeLinkText').innerText = isLogin ? 'Change Password' : 'Back to Login';
+            const btn = document.getElementById('pwPrimaryBtn');
+            btn.innerText = isLogin ? 'Enter Admin Mode' : 'Change Password';
+            btn.className = isLogin
+                ? 'px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl shadow-md'
+                : 'px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md';
+            document.getElementById('adminPwInput').value = '';
+            document.getElementById('curPwInput').value = '';
+            document.getElementById('newPwInput').value = '';
+            document.getElementById('adminPwError').innerText = '';
+            document.getElementById('changePwError').innerText = '';
+            setTimeout(() => {
+                const el = document.getElementById(isLogin ? 'adminPwInput' : 'curPwInput');
+                if (el) el.focus();
+            }, 50);
+        }
+
+        function openAdminPasswordModal() {
+            document.getElementById('adminPasswordModal').classList.remove('hidden');
+            setPwMode('login');
+        }
+
+        function closeAdminPasswordModal() {
+            document.getElementById('adminPasswordModal').classList.add('hidden');
+        }
+
+        function togglePwMode() {
+            setPwMode(pwMode === 'login' ? 'change' : 'login');
+        }
+
+        function submitPwModal() {
+            if (pwMode === 'login') submitAdminPassword(); else submitChangePassword();
+        }
+
+        async function submitAdminPassword() {
+            const input = document.getElementById('adminPwInput');
+            const errEl = document.getElementById('adminPwError');
+            const pw = input.value;
+            if (!isValidPw(pw)) {
+                errEl.innerText = 'Password must be exactly 7 digits.';
+                return;
+            }
+            const ok = (await hashPw(pw)) === (await getStoredPwHash());
+            if (!ok) {
+                errEl.innerText = 'Wrong password. Try again.';
+                input.value = '';
+                input.focus();
+                return;
+            }
+            closeAdminPasswordModal();
+            if (state.currentRole !== 'admin') toggleRole();
+        }
+
+        async function submitChangePassword() {
+            const errEl = document.getElementById('changePwError');
+            const cur = document.getElementById('curPwInput').value;
+            const nw = document.getElementById('newPwInput').value;
+
+            if (!isValidPw(cur)) { errEl.innerText = 'Old password must be exactly 7 digits.'; return; }
+            if (!isValidPw(nw)) { errEl.innerText = 'New password must be exactly 7 digits.'; return; }
+            if ((await hashPw(cur)) !== (await getStoredPwHash())) {
+                errEl.innerText = 'Old password is wrong.';
+                return;
+            }
+            if (cur === nw) { errEl.innerText = 'New password must be different from the old one.'; return; }
+
+            lsSet('mess_admin_pw', await hashPw(nw));
+            setPwMode('login');
+            showToast("Password changed. Use the new password to log in.", "fa-key");
+        }
+
+        function toggleRole() {
+            state.currentRole = state.currentRole === 'user' ? 'admin' : 'user';
+            const summaryBar = document.getElementById('topSummaryBar');
+            if (summaryBar) summaryBar.classList.toggle('hidden', state.currentRole !== 'admin');
+            applyTab4Visibility();
+            const resetBtn = document.getElementById('resetDataBtn');
+            if (resetBtn) resetBtn.classList.toggle('hidden', state.currentRole !== 'admin');
+            const tab4El = document.getElementById('tab4');
+            const tab5El = document.getElementById('tab5');
+            const onAdminTab = (tab4El && !tab4El.classList.contains('hidden')) || (tab5El && !tab5El.classList.contains('hidden'));
+            if (state.currentRole !== 'admin' && onAdminTab) {
+                switchTab('tab1');
+            }
+            const btn = document.getElementById('roleToggleBtn');
+            const roleText = document.getElementById('roleText');
+            const roleIconWrap = document.getElementById('roleIconWrap');
+            const adminMenuEditBtn = document.getElementById('adminMenuEditBtn');
+            const adminAddMemberBtn = document.getElementById('adminAddMemberBtn');
+            const roleNoticeBadge = document.getElementById('roleNoticeBadge');
+
+            if (state.currentRole === 'admin') {
+                btn.className = "flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all duration-300 bg-amber-500 text-slate-950 shadow-md hover:bg-amber-400";
+                roleText.innerText = "Admin Mode";
+                roleIconWrap.innerHTML = '<i class="fa-solid fa-user-shield"></i>';
+                if (adminMenuEditBtn) adminMenuEditBtn.classList.remove('hidden');
+                if (adminAddMemberBtn) adminAddMemberBtn.classList.remove('hidden');
+                if (roleNoticeBadge) {
+                    roleNoticeBadge.innerHTML = `<i class="fa-solid fa-shield-halved text-amber-400"></i><span class="text-amber-300 font-semibold">Admin Mode Active: Full Editing Unlocked</span>`;
+                }
+                showToast("Switched to Admin Mode. Full editing unlocked.", "fa-shield-halved");
+            } else {
+                btn.className = "flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all duration-300 bg-indigo-600 text-white shadow-md hover:bg-indigo-500";
+                roleText.innerText = "User Mode";
+                roleIconWrap.innerHTML = '<i class="fa-solid fa-user"></i>';
+                if (adminMenuEditBtn) adminMenuEditBtn.classList.add('hidden');
+                if (adminAddMemberBtn) adminAddMemberBtn.classList.add('hidden');
+                if (roleNoticeBadge) {
+                    roleNoticeBadge.innerHTML = `<i class="fa-solid fa-info-circle text-indigo-400"></i><span>Click member photo badge to update avatar</span>`;
+                }
+                showToast("Switched to User Mode. View-only mode active.", "fa-user");
+            }
+
+            renderAll();
+        }
+
+        function calculateGlobalStats() {
+            let totalBajar = state.bajar.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+            let totalMeals = 0;
+            Object.values(state.meals).forEach(dateObj => {
+                if (dateObj && typeof dateObj === 'object') {
+                    Object.values(dateObj).forEach(val => {
+                        totalMeals += Number(val || 0);
+                    });
+                }
+            });
+
+            let mealRate = totalMeals > 0 ? (totalBajar / totalMeals) : 0;
+
+            document.getElementById('statTotalBajar').innerText = `৳ ${totalBajar.toFixed(2)}`;
+            document.getElementById('statTotalMeals').innerText = `${totalMeals.toFixed(1)}`;
+            document.getElementById('statMealRate').innerText = `৳ ${mealRate.toFixed(2)}`;
+
+            return { totalBajar, totalMeals, mealRate };
+        }
+
+        function renderTab1() {
+            const todayStr = getLocalDateString();
+            const selectedMenuDate = state.selectedMenuDate || todayStr;
+
+            const datePicker = document.getElementById('tab1MenuDatePicker');
+            if (datePicker) datePicker.value = selectedMenuDate;
+
+            document.getElementById('tab1MenuDateFormatted').innerText = formatDatePretty(selectedMenuDate);
+
+            const todayBadge = document.getElementById('tab1TodayBadge');
+            if (todayBadge) {
+                if (selectedMenuDate === todayStr) {
+                    todayBadge.classList.remove('hidden');
+                } else {
+                    todayBadge.classList.add('hidden');
+                }
+            }
+
+            const menu = state.menus[selectedMenuDate] || {
+                breakfast: 'Standard Breakfast (Not configured)',
+                lunch: 'Standard Lunch (Not configured)',
+                dinner: 'Standard Dinner (Not configured)'
+            };
+
+            document.getElementById('tab1Breakfast').innerText = menu.breakfast;
+            document.getElementById('tab1Lunch').innerText = menu.lunch;
+            document.getElementById('tab1Dinner').innerText = menu.dinner;
+
+            const mealDate = selectedMenuDate;
+            const isToday = mealDate === todayStr;
+            const mealLabel = isToday ? 'Today Meal' : 'Meal on ' + mealDate;
+            const headingEl = document.getElementById('mealLogHeading');
+            if (headingEl) headingEl.innerText = isToday ? 'Mess Members Today Meal Log' : 'Mess Members Meal Log - ' + mealDate;
+
+            const grid = document.getElementById('membersTodayGrid');
+            grid.innerHTML = '';
+            if (state.members.length === 0) {
+                grid.innerHTML = '<div class="col-span-full bg-slate-800/60 border border-dashed border-slate-600 rounded-2xl p-8 text-center text-xs text-slate-400">' +
+                    (state.currentRole === 'admin'
+                        ? 'No members yet. Click <strong class="text-emerald-400">Add Member</strong> above to add the first member.'
+                        : 'No members yet. Please ask the Admin to add members.') +
+                    '</div>';
+            }
+
+            state.members.forEach(member => {
+                const currentVal = Number((state.meals[mealDate] || {})[member.id] || 0);
+                const avatarSrc = member.avatar || placeholderAvatar(member.name);
+
+                const card = document.createElement('div');
+                card.className = "bg-slate-800/90 border border-slate-700/80 rounded-2xl p-4 shadow-lg hover:border-slate-600 transition-all flex flex-col justify-between space-y-3";
+
+                const isAdmin = state.currentRole === 'admin';
+                const buttonStateClass = isAdmin
+                    ? "bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer shadow-md active:scale-95"
+                    : "bg-slate-700/50 text-slate-500 cursor-not-allowed opacity-50";
+
+                card.innerHTML = `
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="flex items-center gap-3">
+                            <div class="relative group cursor-pointer" onclick="triggerPhotoUpload('${member.id}')" title="Click to upload profile photo (max 15 MB)">
+                                <img src="${avatarSrc}" alt="${member.name}" class="w-28 h-28 rounded-2xl object-cover border-2 border-slate-600 shadow-md">
+                                <div class="absolute inset-0 bg-black/60 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <i class="fa-solid fa-camera text-white text-lg"></i>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-bold text-white flex items-center gap-1.5">
+                                    ${member.name}
+                                </h4>
+                                <p class="text-[11px] text-slate-400">${member.room}</p>
+                            </div>
+                        </div>
+                        <input type="file" id="upload-${member.id}" class="hidden" accept="image/*" onchange="handlePhotoUpload(event, '${member.id}')">
+
+                        ${isAdmin ? `<button onclick="openDeleteMemberModal('${member.id}')" title="Delete Member" class="text-slate-500 hover:text-rose-400 p-1 transition-colors"><i class="fa-solid fa-user-minus text-xs"></i></button>` : ''}
+                    </div>
+
+                    <div class="bg-slate-900/90 p-3.5 rounded-2xl border border-slate-700/60 flex items-center justify-between">
+                        <div>
+                            <p class="text-[10px] uppercase tracking-wider font-extrabold text-slate-400">${mealLabel}</p>
+                            <span class="text-4xl sm:text-5xl font-black text-indigo-400 tracking-tight">${currentVal.toFixed(1)}</span>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <button onclick="adjustMeal('${member.id}', -0.5)" ${!isAdmin ? 'disabled' : ''} title="${isAdmin ? 'Decrease meal count' : 'Admin mode required to edit meals'}" class="w-10 h-10 rounded-xl font-black text-xs flex items-center justify-center transition-all ${buttonStateClass}">
+                                -0.5
+                            </button>
+                            <button onclick="adjustMeal('${member.id}', 0.5)" ${!isAdmin ? 'disabled' : ''} title="${isAdmin ? 'Increase meal count' : 'Admin mode required to edit meals'}" class="w-10 h-10 rounded-xl font-black text-xs flex items-center justify-center transition-all ${buttonStateClass}">
+                                +0.5
+                            </button>
+                        </div>
+                    </div>
+
+                    ${isAdmin ? `
+                    <div class="flex items-center justify-between text-xs text-slate-400 pt-1 border-t border-slate-700/50">
+                        <span>Deposit: <strong class="text-emerald-400 font-bold">৳ ${member.deposit}</strong></span>
+                        <button onclick="openDepositModal('${member.id}')" class="text-indigo-400 hover:underline text-[11px] font-bold">Edit Deposit</button>
+                    </div>` : ''}
+                `;
+
+                grid.appendChild(card);
+            });
+
+            renderTopBoard();
+        }
+
+        function onTab1MenuDateChange(newDate) {
+            state.selectedMenuDate = newDate || getLocalDateString();
+            renderTab1();
+        }
+
+        function resetTab1MenuToToday() {
+            state.selectedMenuDate = getLocalDateString();
+            renderTab1();
+        }
+
+        function adjustMeal(memberId, delta) {
+            if (state.currentRole !== 'admin') {
+                showToast("Admin Mode Required to modify meal counts!", "fa-shield-halved");
+                return;
+            }
+
+            const mealDate = state.selectedMenuDate || getLocalDateString();
+            if (!state.meals[mealDate]) state.meals[mealDate] = {};
+
+            let current = Number(state.meals[mealDate][memberId] || 0);
+            let updated = Math.max(0, current + delta);
+            state.meals[mealDate][memberId] = updated;
+
+            saveMeals();
+            renderAll();
+            showToast("Meal count updated.", "fa-circle-check");
+        }
+
+        function triggerPhotoUpload(memberId) {
+            document.getElementById(`upload-${memberId}`).click();
+        }
+
+        function handlePhotoUpload(event, memberId) {
+            const input = event.target;
+                        const file = input.files && input.files[0];
+            if (!file) return;
+
+            if (!file.type || file.type.indexOf('image/') !== 0) {
+                showToast("Please choose a picture file.", "fa-circle-exclamation");
+                input.value = '';
+                return;
+            }
+            if (file.size > 15 * 1024 * 1024) {
+                showToast("Picture is too large. Maximum size is 15 MB.", "fa-circle-exclamation");
+                input.value = '';
+                return;
+            }
+
+            const url = URL.createObjectURL(file);
+            const img = new Image();
+
+            img.onload = function() {
+                // Centre-crop to a square and shrink, so even a 15 MB photo fits in browser storage
+                const size = 600;
+                const side = Math.min(img.naturalWidth, img.naturalHeight);
+                const sx = (img.naturalWidth - side) / 2;
+                const sy = (img.naturalHeight - side) / 2;
+                const canvas = document.createElement('canvas');
+                canvas.width = size;
+                canvas.height = size;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                URL.revokeObjectURL(url);
+
+                const member = state.members.find(m => m.id === memberId);
+                if (!member) { input.value = ''; return; }
+
+                const previous = member.avatar;
+                member.avatar = dataUrl;
+                try {
+                    localStorage.setItem('mess_members', JSON.stringify(state.members));
+                } catch (err) {
+                    member.avatar = previous;
+                    showToast("Could not save the picture (browser storage is full).", "fa-circle-exclamation");
+                    input.value = '';
+                    return;
+                }
+                input.value = '';
+                renderAll();
+                showToast(`Updated photo for ${member.name}`, "fa-camera");
+            };
+
+            img.onerror = function() {
+                URL.revokeObjectURL(url);
+                input.value = '';
+                showToast("This file could not be opened as a picture.", "fa-circle-exclamation");
+            };
+
+            img.src = url;
+        }
+
+        function populateLeaderboardMonthPicker() {
+            const input = document.getElementById('leaderboardMonthSelect');
+            if (!input) return;
+            input.value = state.selectedLeaderboardMonth || getLocalMonthKey(getLocalDateString());
+        }
+
+        function onLeaderboardMonthChange() {
+            const input = document.getElementById('leaderboardMonthSelect');
+            const v = input ? input.value : '';
+            state.selectedLeaderboardMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(v) ? v : getLocalMonthKey(getLocalDateString());
+            renderTopBoard();
+        }
+
+        function renderTopBoard() {
+            populateLeaderboardMonthPicker();
+
+            const selectedMonthKey = state.selectedLeaderboardMonth || getLocalMonthKey(getLocalDateString());
+            const monthFormatted = getMonthNameFormatted(selectedMonthKey);
+
+            const titleEl = document.getElementById('leaderboardTitle');
+            if (titleEl) {
+                titleEl.innerHTML = `🏆 Monthly Leaderboard - <span class="text-amber-400 font-extrabold">${monthFormatted}</span>`;
+            }
+
+            const memberTotals = state.members.map(m => {
+                let monthlySum = 0;
+                Object.entries(state.meals).forEach(([dateStr, dateObj]) => {
+                    if (getLocalMonthKey(dateStr) === selectedMonthKey && dateObj && typeof dateObj === 'object') {
+                        monthlySum += Number(dateObj[m.id] || 0);
+                    }
+                });
+                return { ...m, monthlyMeals: monthlySum };
+            });
+
+            memberTotals.sort((a, b) => b.monthlyMeals - a.monthlyMeals);
+            const maxMeals = Math.max(...memberTotals.map(m => m.monthlyMeals), 1);
+
+            const champCard = document.getElementById('championHighlightCard');
+            if (memberTotals.length > 0 && memberTotals[0].monthlyMeals > 0) {
+                const champ = memberTotals[0];
+                const champAvatar = champ.avatar || placeholderAvatar(champ.name);
+                champCard.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="relative">
+                            <img src="${champAvatar}" class="w-28 h-28 rounded-2xl object-cover border-2 border-amber-400 shadow-xl">
+                            <span class="absolute -top-2 -right-2 bg-amber-500 text-slate-950 rounded-full w-6 h-6 flex items-center justify-center text-xs shadow-md">👑</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] uppercase font-black tracking-wider text-amber-400">#1 Top Eater (${monthFormatted})</span>
+                            <h4 class="text-base font-black text-white">${champ.name}</h4>
+                            <p class="text-xs text-slate-400">${champ.room}</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-2xl font-black text-amber-400">${champ.monthlyMeals.toFixed(1)}</span>
+                        <span class="text-xs text-slate-400 block font-semibold">Meals in ${monthFormatted}</span>
+                    </div>
+                `;
+            } else {
+                champCard.innerHTML = `
+                    <div class="flex items-center gap-3 text-slate-400 text-xs py-2">
+                        <i class="fa-solid fa-circle-info text-amber-400 text-base"></i>
+                        <span>No meal records found for ${monthFormatted}. Select another month or record today's meals!</span>
+                    </div>
+                `;
+            }
+
+            const container = document.getElementById('topBoardContainer');
+            container.innerHTML = '';
+
+            memberTotals.forEach((member, index) => {
+                let badge = '';
+                if (index === 0 && member.monthlyMeals > 0) badge = '<span class="text-lg">🥇</span>';
+                else if (index === 1 && member.monthlyMeals > 0) badge = '<span class="text-lg">🥈</span>';
+                else if (index === 2 && member.monthlyMeals > 0) badge = '<span class="text-lg">🥉</span>';
+                else badge = `<span class="text-xs font-bold text-slate-400">#${index + 1}</span>`;
+
+                const pct = Math.min(100, Math.round((member.monthlyMeals / maxMeals) * 100));
+
+                const item = document.createElement('div');
+                item.className = "bg-slate-850 p-3 rounded-xl border border-slate-700/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3";
+                item.innerHTML = `
+                    <div class="flex items-center gap-3 w-full sm:w-1/3">
+                        <div class="w-6 flex justify-center">${badge}</div>
+                        <div>
+                            <h4 class="text-xs font-bold text-white">${member.name}</h4>
+                            <p class="text-[10px] text-slate-400">${member.room}</p>
+                        </div>
+                    </div>
+
+                    <div class="w-full sm:w-2/3 flex items-center gap-3">
+                        <div class="flex-grow bg-slate-900 h-2.5 rounded-full overflow-hidden border border-slate-700">
+                            <div class="bg-gradient-to-r from-amber-500 to-indigo-500 h-full rounded-full transition-all duration-500" style="width: ${pct}%"></div>
+                        </div>
+                        <span class="text-xs font-black text-amber-400 w-20 text-right">${member.monthlyMeals.toFixed(1)} Meals</span>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function renderTab2() {
+            const picker = document.getElementById('calendarDatePicker');
+            picker.value = state.selectedCalendarDate;
+
+            const selDate = state.selectedCalendarDate;
+            document.getElementById('calendarSelectedDateLabel').innerText = `Date: ${selDate}`;
+
+            const menu = state.menus[selDate] || { breakfast: 'Menu not set for this date', lunch: 'Menu not set for this date', dinner: 'Menu not set for this date' };
+            document.getElementById('calBreakfast').innerText = menu.breakfast;
+            document.getElementById('calLunch').innerText = menu.lunch;
+            document.getElementById('calDinner').innerText = menu.dinner;
+
+            const authorSelect = document.getElementById('commentAuthorSelect');
+            const prevAuthor = authorSelect.value;
+            authorSelect.innerHTML = state.members.map(m => `<option value="${m.id}">${m.name} (${m.room})</option>`).join('');
+            if (prevAuthor && state.members.some(m => m.id === prevAuthor)) authorSelect.value = prevAuthor;
+            document.getElementById('commentDateNotice').innerText = selDate;
+
+            const objectionsForDate = state.objections.filter(o => o.date === selDate);
+            document.getElementById('objectionCountText').innerText = `${objectionsForDate.length} Feedback entries`;
+
+            const objList = document.getElementById('objectionsList');
+            objList.innerHTML = '';
+
+            if (objectionsForDate.length === 0) {
+                objList.innerHTML = `<p class="text-xs text-slate-500 italic text-center py-4">No feedback recorded for ${selDate}.</p>`;
+            } else {
+                objectionsForDate.forEach(obj => {
+                    const author = state.members.find(m => m.id === obj.authorId) || { name: 'Unknown' };
+                    const item = document.createElement('div');
+                    item.className = "bg-slate-900 p-3 rounded-xl border border-slate-700/60 flex items-start justify-between gap-2";
+                    item.innerHTML = `
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="text-xs font-bold text-amber-400">${author.name}</span>
+                                <span class="text-[10px] text-slate-500 font-mono">${obj.timestamp}</span>
+                            </div>
+                            <p class="text-xs text-slate-300">${obj.comment}</p>
+                        </div>
+                        ${state.currentRole === 'admin' ? `<button onclick="deleteObjection(${obj.id})" class="text-slate-500 hover:text-rose-400 text-xs"><i class="fa-solid fa-trash"></i></button>` : ''}
+                    `;
+                    objList.appendChild(item);
+                });
+            }
+
+            renderMealMatrix();
+        }
+
+        function onCalendarDateChange() {
+            const picker = document.getElementById('calendarDatePicker');
+            state.selectedCalendarDate = picker.value || getLocalDateString();
+            renderTab2();
+        }
+
+        function resetCalendarToToday() {
+            state.selectedCalendarDate = getLocalDateString();
+            renderTab2();
+        }
+
+        function addObjectionComment() {
+            const authorId = document.getElementById('commentAuthorSelect').value;
+            const text = document.getElementById('commentTextInput').value.trim();
+            if (!text) {
+                showToast("Please enter feedback text.", "fa-circle-exclamation");
+                return;
+            }
+
+            const now = new Date();
+            const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+            const newObj = {
+                id: Date.now(),
+                date: state.selectedCalendarDate,
+                authorId: authorId,
+                comment: text,
+                timestamp: timeStr
+            };
+
+            state.objections.unshift(newObj);
+            saveObjectionsData();
+            document.getElementById('commentTextInput').value = '';
+            renderTab2();
+            showToast("Feedback submitted.", "fa-paper-plane");
+        }
+
+        function deleteObjection(id) {
+            state.objections = state.objections.filter(o => o.id !== id);
+            saveObjectionsData();
+            renderTab2();
+            showToast("Objection deleted.", "fa-trash");
+        }
+
+        function renderMealMatrix() {
+            const headerRow = document.getElementById('matrixHeaderRow');
+            const body = document.getElementById('matrixBody');
+
+            const selDate = state.selectedCalendarDate || getLocalDateString();
+
+            // Selected date + the 6 days before it (oldest to newest)
+            const dates = [];
+            for (let i = 6; i >= 0; i--) dates.push(shiftDateString(selDate, -i));
+
+            const note = document.getElementById('matrixRangeNote');
+            if (note) note.innerText = `Showing ${dates[0]} to ${selDate} (selected date highlighted)`;
+
+            headerRow.innerHTML = '<th class="p-3">Member</th>' + dates.map(d => {
+                const isSel = d === selDate;
+                return `<th class="p-3 text-center ${isSel ? 'bg-indigo-600/30 text-indigo-300' : ''}">${d.slice(5)}</th>`;
+            }).join('') + '<th class="p-3 text-center text-amber-400">Total</th>';
+
+            body.innerHTML = '';
+            const dateTotals = dates.map(() => 0);
+            let grand = 0;
+
+            state.members.forEach(member => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-800/50";
+                let cells = `<td class="p-3 font-semibold text-white">${member.name}</td>`;
+                let rowTotal = 0;
+                dates.forEach((d, idx) => {
+                    const count = Number(state.meals[d]?.[member.id] || 0);
+                    rowTotal += count;
+                    dateTotals[idx] += count;
+                    const isSel = d === selDate;
+                    cells += `<td class="p-3 text-center font-bold ${isSel ? 'bg-indigo-600/20 text-indigo-300' : 'text-slate-300'}">${count > 0 ? count.toFixed(1) : '-'}</td>`;
+                });
+                grand += rowTotal;
+                cells += `<td class="p-3 text-center font-black text-amber-400">${rowTotal > 0 ? rowTotal.toFixed(1) : '-'}</td>`;
+                tr.innerHTML = cells;
+                body.appendChild(tr);
+            });
+
+            const totalTr = document.createElement('tr');
+            totalTr.className = "bg-slate-900/70";
+            totalTr.innerHTML = `<td class="p-3 font-black text-white">Day Total</td>` +
+                dates.map((d, idx) => `<td class="p-3 text-center font-black ${d === selDate ? 'bg-indigo-600/30 text-indigo-300' : 'text-emerald-400'}">${dateTotals[idx] > 0 ? dateTotals[idx].toFixed(1) : '-'}</td>`).join('') +
+                `<td class="p-3 text-center font-black text-amber-400">${grand.toFixed(1)}</td>`;
+            body.appendChild(totalTr);
+        }
+
+        function shiftDateString(dateStr, delta) {
+            const parts = (dateStr || '').split('-').map(Number);
+            if (parts.length !== 3 || parts.some(isNaN)) return getLocalDateString();
+            return getLocalDateString(new Date(parts[0], parts[1] - 1, parts[2] + delta));
+        }
+
+        function renderTab3() {
+            const buyerSelect = document.getElementById('bajarBuyerSelect');
+            const prevBuyer = buyerSelect.value;
+            buyerSelect.innerHTML = state.members.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+            if (prevBuyer && state.members.some(m => m.id === prevBuyer)) buyerSelect.value = prevBuyer;
+
+            const todayEl = document.getElementById('bajarTodayDate');
+            if (todayEl) todayEl.innerText = formatDatePretty(getLocalDateString());
+            renderBajarDraft();
+
+            const body = document.getElementById('bajarTableBody');
+            body.innerHTML = '';
+
+            document.getElementById('bajarCountBadge').innerText = `${state.bajar.length} Records`;
+
+            let bajarSubtotal = 0;
+            state.bajar.forEach(item => {
+                bajarSubtotal += Number(item.amount || 0);
+                const buyer = state.members.find(m => m.id === item.buyerId) || { name: 'Unknown' };
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-800/50";
+                tr.innerHTML = `
+                    <td class="p-3 text-slate-400 font-mono text-[11px]">${item.date}</td>
+                    <td class="p-3 font-bold text-white">${buyer.name}</td>
+                    <td class="p-3 text-slate-300">${bajarItemsCellHtml(item)}</td>
+                                        <td class="p-3 text-right font-black text-emerald-400">৳ ${Number(item.amount).toFixed(2)}</td>
+                    <td class="p-3 text-center">
+                        ${state.currentRole === 'admin' ? `<button onclick="deleteBajar(${item.id})" class="text-slate-500 hover:text-rose-400"><i class="fa-solid fa-trash"></i></button>` : '-'}
+                    </td>
+                `;
+                body.appendChild(tr);
+            });
+
+            const isAdminT3 = state.currentRole === 'admin';
+            const bajarCard = document.getElementById('bajarEntryCard');
+            if (bajarCard) bajarCard.classList.toggle('hidden', !isAdminT3);
+            const addBox = document.getElementById('extraBillAddBox');
+            if (addBox) addBox.classList.toggle('hidden', !isAdminT3);
+
+            renderExtraBills();
+
+            const extraSubtotal = Object.values(state.extraSectors).reduce((a, v) => a + (Number(v) || 0), 0);
+
+            const grandTotal = bajarSubtotal + extraSubtotal;
+            const memberCount = state.members.length;
+            const perHeadExtra = memberCount > 0 ? (extraSubtotal / memberCount) : 0;
+
+            document.getElementById('statBajarSubtotal').innerText = `৳ ${bajarSubtotal.toFixed(2)}`;
+            document.getElementById('statExtraSubtotal').innerText = `৳ ${extraSubtotal.toFixed(2)}`;
+            document.getElementById('statGrandTotal').innerText = `৳ ${grandTotal.toFixed(2)}`;
+            document.getElementById('statPerHeadExtra').innerText = `৳ ${perHeadExtra.toFixed(2)}`;
+        }
+
+        const COMMON_BAJAR_ITEMS = [
+            'Rice', 'Chicken', 'Fish', 'Egg', 'Oil', 'Lentils', 'Potato', 'Vegetables', 'Onion',
+            'Ginger', 'Garlic', 'Chili Powder', 'Turmeric Powder', 'Coriander Powder',
+            'Cumin Powder', 'Garam Masala Powder', 'Whole Garam Masala'
+        ];
+        let bajarDraft = []; // [{ name, amount, custom }]
+
+        function bajarItemsCellHtml(item) {
+            if (Array.isArray(item.lines) && item.lines.length > 0) {
+                return item.lines.map(l =>
+                    escapeHtml(l.name) + ' <span class="text-emerald-400 font-bold">৳' + Number(l.amount || 0) + '</span>'
+                ).join(', ');
+            }
+            return escapeHtml(item.items || '');
+        }
+
+        function findBajarDraftIndex(name) {
+            const n = String(name).trim().toLowerCase();
+            return bajarDraft.findIndex(l => l.name.toLowerCase() === n);
+        }
+
+        function toggleBajarCommonItem(idx) {
+            const name = COMMON_BAJAR_ITEMS[idx];
+            if (!name) return;
+            const i = findBajarDraftIndex(name);
+            if (i >= 0) bajarDraft.splice(i, 1);
+            else bajarDraft.push({ name: name, amount: '', custom: false });
+            renderBajarDraft();
+        }
+
+        function addCustomBajarItem() {
+            const input = document.getElementById('bajarCustomName');
+            const name = input.value.trim();
+            if (!name) { showToast("Please type a custom item name.", "fa-circle-exclamation"); return; }
+            if (findBajarDraftIndex(name) >= 0) { showToast("This item is already added.", "fa-circle-exclamation"); return; }
+            bajarDraft.push({ name: name, amount: '', custom: true });
+            input.value = '';
+            renderBajarDraft();
+        }
+
+        function removeBajarDraftItem(i) {
+            bajarDraft.splice(i, 1);
+            renderBajarDraft();
+        }
+
+        function updateBajarDraftAmount(i, v) {
+            if (bajarDraft[i]) bajarDraft[i].amount = v;
+            updateBajarDraftTotal();
+        }
+
+        function getBajarDraftTotal() {
+            return bajarDraft.reduce((sum, l) => sum + (parseFloat(l.amount) || 0), 0);
+        }
+
+        function updateBajarDraftTotal() {
+            const el = document.getElementById('bajarDraftTotal');
+            if (el) el.innerText = '৳ ' + getBajarDraftTotal().toFixed(2);
+        }
+
+        function renderBajarDraft() {
+            const chips = document.getElementById('bajarChips');
+            const list = document.getElementById('bajarDraftList');
+            if (!chips || !list) return;
+
+            chips.innerHTML = COMMON_BAJAR_ITEMS.map((name, idx) => {
+                const active = findBajarDraftIndex(name) >= 0;
+                const cls = active
+                    ? 'bg-indigo-600 border-indigo-400 text-white'
+                    : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-indigo-500';
+                return '<button type="button" onclick="toggleBajarCommonItem(' + idx + ')" class="px-2.5 py-1 rounded-full border text-[11px] font-bold transition-all ' + cls + '">' + escapeHtml(name) + '</button>';
+            }).join('');
+
+            if (bajarDraft.length === 0) {
+                list.innerHTML = '<p class="text-[11px] text-slate-500 italic">No items selected yet. Tap an item above or add a custom one, then enter the amount for each.</p>';
+            } else {
+                list.innerHTML = bajarDraft.map((l, i) =>
+                    '<div class="flex items-center gap-2 bg-slate-900/60 p-2 rounded-xl border border-slate-700/60">' +
+                        '<span class="flex-grow text-xs font-bold text-white">' + escapeHtml(l.name) +
+                            (l.custom ? ' <span class="text-[9px] text-amber-400 font-extrabold uppercase">custom</span>' : '') + '</span>' +
+                        '<span class="text-xs text-slate-400">৳</span>' +
+                        '<input type="number" min="0" step="0.5" value="' + escapeHtml(l.amount) + '" placeholder="Amount" oninput="updateBajarDraftAmount(' + i + ', this.value)" class="w-24 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">' +
+                        '<button type="button" onclick="removeBajarDraftItem(' + i + ')" title="Remove" class="text-slate-500 hover:text-rose-400 p-1"><i class="fa-solid fa-xmark"></i></button>' +
+                    '</div>'
+                ).join('');
+            }
+            updateBajarDraftTotal();
+        }
+
+        function handleAddBajar(e) {
+            e.preventDefault();
+            if (state.currentRole !== 'admin') {
+                showToast("Admin Mode Required to add bajar records.", "fa-shield-halved");
+                return;
+            }
+            const buyerId = document.getElementById('bajarBuyerSelect').value;
+            if (!buyerId) { showToast("Please select a buyer member.", "fa-circle-exclamation"); return; }
+            if (bajarDraft.length === 0) { showToast("Select at least one item.", "fa-circle-exclamation"); return; }
+
+            const lines = bajarDraft.map(l => ({ name: l.name, amount: parseFloat(l.amount) || 0 }));
+            const missing = lines.find(l => l.amount <= 0);
+            if (missing) { showToast("Enter an amount for " + missing.name + ".", "fa-circle-exclamation"); return; }
+
+            const total = lines.reduce((sum, l) => sum + l.amount, 0);
+
+            const newItem = {
+                id: Date.now(),
+                date: getLocalDateString(),   // always the current date
+                buyerId: buyerId,
+                items: lines.map(l => l.name).join(', '),
+                amount: total,
+                lines: lines
+            };
+
+            state.bajar.unshift(newItem);
+            saveBajarData();
+
+            bajarDraft = [];
+            renderAll();
+            showToast("Bajar record added.", "fa-cart-plus");
+        }
+
+        function deleteBajar(id) {
+            if (state.currentRole !== 'admin') {
+                showToast("Admin Mode Required to delete records.", "fa-shield-halved");
+                return;
+            }
+            state.bajar = state.bajar.filter(b => b.id !== id);
+            saveBajarData();
+            renderAll();
+            showToast("Bajar record deleted.", "fa-trash");
+        }
+
+        const DEFAULT_EXTRA_LABELS = {};
+
+        function escapeHtml(s) {
+            return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        function getExtraLabel(key) {
+            return (state.extraLabels && state.extraLabels[key]) || DEFAULT_EXTRA_LABELS[key] || key;
+        }
+
+        function saveExtraLabelsData() { lsSet('mess_extra_labels', JSON.stringify(state.extraLabels || {})); }
+
+        function renderExtraBills() {
+            const list = document.getElementById('extraBillsList');
+            if (!list) return;
+            const isAdmin = state.currentRole === 'admin';
+            const keys = Object.keys(state.extraSectors);
+            list.innerHTML = '';
+
+            if (keys.length === 0) {
+                list.innerHTML = `<p class="text-xs text-slate-500 italic text-center py-3">No extra bills yet.</p>`;
+                return;
+            }
+
+            keys.forEach(key => {
+                const label = getExtraLabel(key);
+                const amt = Number(state.extraSectors[key] || 0);
+                const row = document.createElement('div');
+
+                if (isAdmin) {
+                    row.className = 'bg-slate-900/60 p-3 rounded-xl border border-slate-700/60 space-y-2';
+                    row.innerHTML = `
+                        <div class="flex items-center gap-2">
+                            <input type="text" value="${escapeHtml(label)}" onchange="renameExtraBill('${key}', this.value)" class="flex-grow bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <button type="button" onclick="deleteExtraBill('${key}')" title="Delete this bill" class="text-slate-500 hover:text-rose-400 p-1.5"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                        <input type="number" min="0" value="${amt}" onchange="updateExtraBillAmount('${key}', this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    `;
+                } else {
+                    row.className = 'flex items-center justify-between bg-slate-900/60 px-3 py-2.5 rounded-xl border border-slate-700/60';
+                    row.innerHTML = `
+                        <span class="text-xs text-slate-300 font-semibold">${escapeHtml(label)}</span>
+                        <span class="text-xs font-black text-amber-400">৳ ${amt.toFixed(2)}</span>
+                    `;
+                }
+                list.appendChild(row);
+            });
+        }
+
+        function requireAdminExtra() {
+            if (state.currentRole !== 'admin') {
+                showToast("Admin Mode Required to modify extra bills.", "fa-shield-halved");
+                renderTab3();
+                return false;
+            }
+            return true;
+        }
+
+        function addExtraBill() {
+            if (!requireAdminExtra()) return;
+            const nameEl = document.getElementById('extraNewName');
+            const amtEl = document.getElementById('extraNewAmount');
+            const name = nameEl.value.trim();
+            const amount = parseFloat(amtEl.value);
+            if (!name) { showToast("Please enter a bill name.", "fa-circle-exclamation"); return; }
+            if (isNaN(amount) || amount < 0) { showToast("Please enter a valid amount.", "fa-circle-exclamation"); return; }
+
+            const key = 'b_' + Date.now();
+            state.extraSectors[key] = amount;
+            state.extraLabels[key] = name;
+            saveExtraSectorsData();
+            saveExtraLabelsData();
+            nameEl.value = '';
+            amtEl.value = '';
+            renderAll();
+            showToast(`Added bill: ${name}`, "fa-plus");
+        }
+
+        function renameExtraBill(key, newName) {
+            if (!requireAdminExtra()) return;
+            const name = (newName || '').trim();
+            if (!name) { showToast("Bill name cannot be empty.", "fa-circle-exclamation"); renderTab3(); return; }
+            state.extraLabels[key] = name;
+            saveExtraLabelsData();
+            renderAll();
+            showToast("Bill name updated.", "fa-floppy-disk");
+        }
+
+        function updateExtraBillAmount(key, val) {
+            if (!requireAdminExtra()) return;
+            state.extraSectors[key] = Math.max(0, parseFloat(val) || 0);
+            saveExtraSectorsData();
+            renderAll();
+            showToast("Bill amount saved.", "fa-floppy-disk");
+        }
+
+        function deleteExtraBill(key) {
+            if (!requireAdminExtra()) return;
+            const label = getExtraLabel(key);
+            delete state.extraSectors[key];
+            if (state.extraLabels) delete state.extraLabels[key];
+            saveExtraSectorsData();
+            saveExtraLabelsData();
+            renderAll();
+            showToast(`Deleted bill: ${label}`, "fa-trash");
+        }
+
+        function fmtNum(n) {
+            const r = Math.round(Number(n) * 10) / 10;
+            return Number.isInteger(r) ? String(r) : r.toFixed(1);
+        }
+
+        function loadAuditSettings() {
+            state.audit = { cycleDays: 62, buwaMiss: 5, percent: 70 };
+            const raw = lsGet('mess_audit_settings');
+            if (raw) {
+                try {
+                    const o = JSON.parse(raw);
+                    if (o && typeof o === 'object') {
+                        if (Number(o.cycleDays) >= 1) state.audit.cycleDays = Number(o.cycleDays);
+                        if (Number(o.buwaMiss) >= 0) state.audit.buwaMiss = Number(o.buwaMiss);
+                        if (Number(o.percent) >= 0 && Number(o.percent) <= 100) state.audit.percent = Number(o.percent);
+                    }
+                } catch (e) {}
+            }
+        }
+
+        function updateAuditSettings() {
+            if (state.currentRole !== 'admin') {
+                showToast("Admin Mode Required to change audit variables.", "fa-shield-halved");
+                renderAuditLedger();
+                return;
+            }
+            const cycle = parseInt(document.getElementById('auditCycleDaysInput').value);
+            const buwa = parseFloat(document.getElementById('auditBuwaInput').value);
+            const pct = parseFloat(document.getElementById('auditPercentInput').value);
+
+            state.audit = {
+                cycleDays: (cycle >= 1 && cycle <= 366) ? cycle : state.audit.cycleDays,
+                buwaMiss: (buwa >= 0) ? buwa : state.audit.buwaMiss,
+                percent: (pct >= 0 && pct <= 100) ? pct : state.audit.percent
+            };
+            lsSet('mess_audit_settings', JSON.stringify(state.audit));
+            renderAuditLedger();
+            showToast("Audit variables updated.", "fa-floppy-disk");
+        }
+
+        function updateMemberDeposit(memberId, val) {
+            if (state.currentRole !== 'admin') return;
+            const member = state.members.find(m => m.id === memberId);
+            if (member) {
+                member.deposit = Math.max(0, parseFloat(val) || 0);
+                saveMembers();
+                renderAll();
+                showToast("Deposit updated.", "fa-wallet");
+            }
+        }
+
+        function renderAuditLedger() {
+            if (!state.audit) loadAuditSettings();
+            const isAdmin = state.currentRole === 'admin';
+            const cycleDays = state.audit.cycleDays;
+            const buwaMiss = state.audit.buwaMiss;
+            const pct = state.audit.percent;
+            state.cycleDays = cycleDays;
+
+            // sync variable inputs
+            const cycleEl = document.getElementById('auditCycleDaysInput');
+            const buwaEl = document.getElementById('auditBuwaInput');
+            const pctEl = document.getElementById('auditPercentInput');
+                        cycleEl.value = cycleDays; buwaEl.value = buwaMiss; pctEl.value = pct;
+            [cycleEl, buwaEl, pctEl].forEach(el => { el.disabled = !isAdmin; });
+            document.getElementById('auditEditNotice').innerText = isAdmin
+                ? 'Admin Mode: you can edit the variables, absent days and deposits.'
+                : 'View only. Switch to Admin Mode to edit variables.';
+
+            // formula texts follow the variables
+            document.getElementById('fmActive').innerText = 'Active Days = Cycle Days (' + cycleDays + ') - Home (Absent) Days';
+            document.getElementById('fmReq').innerText = pct + '% Req = Active Days x ' + pct + '% (rounded up)';
+            document.getElementById('fmMin').innerText = 'Min Target = ' + pct + '% Req - Buwa Miss (' + buwaMiss + ')';
+            document.getElementById('thPercentReq').innerText = pct + '% Req.';
+
+            const { totalBajar } = calculateGlobalStats();
+
+            const totalExtra = Object.values(state.extraSectors).reduce((acc, val) => acc + Number(val || 0), 0);
+            const perHeadExtra = state.members.length > 0 ? (totalExtra / state.members.length) : 0;
+
+            // Step 1: per-member targets and billable meals
+            const rows = state.members.map(member => {
+                let actualMeals = 0;
+                Object.values(state.meals).forEach(dateObj => {
+                    if (dateObj && typeof dateObj === 'object') {
+                        actualMeals += Number(dateObj[member.id] || 0);
+                    }
+                });
+
+                const absentDays = Number(member.absentDays || 0);
+                const activeDays = Math.max(0, cycleDays - absentDays);
+                const reqPct = Math.ceil(Number((activeDays * pct / 100).toFixed(6)));
+                const minTarget = Math.max(0, reqPct - buwaMiss);
+                const diff = actualMeals - minTarget;
+                const passed = diff >= 0;
+                // below the target: billed as the target meals
+                const billableMeals = Math.max(actualMeals, minTarget);
+
+                return { member, actualMeals, absentDays, activeDays, reqPct, minTarget, diff, passed, billableMeals };
+            });
+
+            // Step 2: total billable meals of all members, then meal rate
+            const totalBillable = rows.reduce((sum, r) => sum + r.billableMeals, 0);
+            const mealRate = totalBillable > 0 ? (totalBajar / totalBillable) : 0;
+
+            document.getElementById('auditTotalBajar').innerText = '৳ ' + totalBajar.toFixed(2);
+            document.getElementById('auditTotalBillable').innerText = fmtNum(totalBillable);
+            document.getElementById('auditMealRate').innerText = '৳ ' + mealRate.toFixed(2);
+
+            // Step 3: render rows
+            const body = document.getElementById('auditLedgerBody');
+            body.innerHTML = '';
+            const snapshotRows = [];
+
+            rows.forEach(r => {
+                const member = r.member;
+                const mealCost = r.billableMeals * mealRate;
+                const totalExpense = mealCost + perHeadExtra;
+                const deposit = Number(member.deposit || 0);
+                const balance = deposit - totalExpense;
+
+                const isRefund = balance >= 0;
+                const balanceBadgeClass = isRefund ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-rose-500/20 text-rose-400 border-rose-500/30";
+                const balanceLabel = isRefund ? 'REFUND: ৳ ' + balance.toFixed(2) : 'DUE: ৳ ' + Math.abs(balance).toFixed(2);
+
+                snapshotRows.push({
+                    name: member.name,
+                    absentDays: r.absentDays,
+                    activeDays: r.activeDays,
+                    reqPct: r.reqPct,
+                    buwaMiss: buwaMiss,
+                    minTarget: r.minTarget,
+                    actualMeals: r.actualMeals,
+                    passed: r.passed,
+                    statusText: r.passed ? 'Passed (+' + fmtNum(r.diff) + ')' : 'Deficit (-' + fmtNum(Math.abs(r.diff)) + ')',
+                    billableMeals: r.billableMeals,
+                    mealCost: mealCost,
+                    extraShare: perHeadExtra,
+                    deposit: deposit,
+                    isRefund: isRefund,
+                    balanceText: (isRefund ? 'Refund: Tk ' : 'Due: Tk ') + Math.abs(balance).toFixed(2)
+                });
+
+                const statusBadge = r.passed
+                    ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 whitespace-nowrap">&#10003; Passed (+' + fmtNum(r.diff) + ')</span>'
+                    : '<span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-500/20 text-rose-400 border border-rose-500/30 whitespace-nowrap">&#10007; Deficit (-' + fmtNum(Math.abs(r.diff)) + ')</span>';
+
+                const absentCell = isAdmin
+                    ? '<input type="number" min="0" max="' + cycleDays + '" value="' + r.absentDays + '" onchange="updateMemberAbsentDays(\'' + member.id + '\', this.value)" class="w-14 bg-slate-900 border border-slate-700 text-center rounded-lg text-xs py-1 text-amber-400 font-black">'
+                    : '<span class="font-black text-amber-400">' + r.absentDays + '</span>';
+
+                const depositCell = isAdmin
+                    ? '<input type="number" min="0" step="100" value="' + deposit + '" onchange="updateMemberDeposit(\'' + member.id + '\', this.value)" class="w-24 bg-slate-900 border border-slate-700 text-right rounded-lg text-xs py-1 px-2 text-emerald-400 font-bold">'
+                    : '<span class="font-bold text-emerald-400">৳ ' + deposit.toFixed(2) + '</span>';
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-800/50";
+                tr.innerHTML =
+                    '<td class="p-3 font-bold text-white">' + escapeHtml(member.name) +
+                        '<span class="block text-[10px] text-slate-400 font-normal">' + escapeHtml(member.room) + '</span></td>' +
+                    '<td class="p-3 text-center">' + absentCell + '</td>' +
+                    '<td class="p-3 text-center font-bold text-slate-300">' + r.activeDays + '</td>' +
+                    '<td class="p-3 text-center font-bold text-slate-300">' + r.reqPct + '</td>' +
+                    '<td class="p-3 text-center font-bold text-slate-400">' + fmtNum(buwaMiss) + '</td>' +
+                    '<td class="p-3 text-center font-black text-indigo-400 bg-indigo-500/5">' + fmtNum(r.minTarget) + '</td>' +
+                    '<td class="p-3 text-center font-black text-white">' + fmtNum(r.actualMeals) + '</td>' +
+                    '<td class="p-3 text-center">' + statusBadge + '</td>' +
+                    '<td class="p-3 text-center font-black text-emerald-400">' + fmtNum(r.billableMeals) + '</td>' +
+                    '<td class="p-3 text-right font-medium text-slate-200">৳ ' + mealCost.toFixed(2) + '</td>' +
+                    '<td class="p-3 text-right font-medium text-slate-200">৳ ' + perHeadExtra.toFixed(2) + '</td>' +
+                    '<td class="p-3 text-right">' + depositCell + '</td>' +
+                    '<td class="p-3 text-center"><span class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border whitespace-nowrap ' + balanceBadgeClass + '">' + balanceLabel + '</span></td>';
+
+                body.appendChild(tr);
+            });
+
+            state.auditSnapshot = { rows: snapshotRows, totalBajar, totalBillable, mealRate, perHeadExtra, cycleDays, buwaMiss, pct };
+        }
+
+        async function downloadAuditPdf() {
+            if (state.currentRole !== 'admin') {
+                showToast("Admin Mode Required to download the PDF.", "fa-shield-halved");
+                return;
+            }
+            if (!window.jspdf || !window.jspdf.jsPDF) {
+                showToast("PDF library could not load. Check your internet connection.", "fa-circle-exclamation");
+                return;
+            }
+
+            renderAuditLedger();
+            const snap = state.auditSnapshot;
+            if (!snap || snap.rows.length === 0) {
+                showToast("No members to include in the PDF.", "fa-circle-exclamation");
+                return;
+            }
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+            const pageW = doc.internal.pageSize.getWidth();
+            const margin = 30;
+
+            // Title band
+            doc.setFillColor(15, 23, 42);
+            doc.rect(0, 0, pageW, 66, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(20);
+            doc.text('Mess Audit & Settlement Report', margin, 32);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(186, 200, 220);
+            doc.text('Generated: ' + new Date().toLocaleString('en-US'), margin, 52);
+
+            // Variables
+            doc.setTextColor(30, 41, 59);
+            doc.setFontSize(10);
+            doc.text(
+                'Cycle Days: ' + snap.cycleDays + '    |    Buwa Miss: ' + fmtNum(snap.buwaMiss) + ' days    |    Required Percentage: ' + snap.pct + '%',
+                margin, 88
+            );
+
+            // Summary boxes
+            const boxes = [
+                { label: 'TOTAL BAJAR', value: 'Tk ' + snap.totalBajar.toFixed(2), color: [79, 70, 229] },
+                { label: 'TOTAL BILLABLE MEALS (ALL MEMBERS)', value: fmtNum(snap.totalBillable), color: [5, 150, 105] },
+                { label: 'MEAL RATE (BAJAR / BILLABLE MEALS)', value: 'Tk ' + snap.mealRate.toFixed(2), color: [217, 119, 6] }
+            ];
+            const gap = 12;
+            const boxW = (pageW - margin * 2 - gap * 2) / 3;
+            boxes.forEach((b, i) => {
+                const x = margin + i * (boxW + gap);
+                doc.setDrawColor(b.color[0], b.color[1], b.color[2]);
+                doc.setFillColor(248, 250, 252);
+                doc.roundedRect(x, 100, boxW, 46, 6, 6, 'FD');
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(7.5);
+                doc.setTextColor(100, 116, 139);
+                doc.text(b.label, x + 10, 116);
+                doc.setFontSize(15);
+                doc.setTextColor(b.color[0], b.color[1], b.color[2]);
+                doc.text(b.value, x + 10, 136);
+            });
+
+            // Ledger table
+            const head = [[
+                'Member', 'Home (Absent)', 'Active Days', snap.pct + '% Req.', 'Buwa Miss', 'Min. Target',
+                'Actual Eaten', 'Final Status', 'Billable Meals', 'Meal Cost (Tk)', 'Extra Share (Tk)', 'Deposit (Tk)', 'Final Balance'
+            ]];
+            const body = snap.rows.map(r => [
+                r.name, String(r.absentDays), String(r.activeDays), String(r.reqPct), fmtNum(r.buwaMiss), fmtNum(r.minTarget),
+                fmtNum(r.actualMeals), r.statusText, fmtNum(r.billableMeals), r.mealCost.toFixed(2), r.extraShare.toFixed(2),
+                r.deposit.toFixed(2), r.balanceText
+            ]);
+
+            doc.autoTable({
+                startY: 162,
+                head: head,
+                body: body,
+                theme: 'grid',
+                margin: { left: margin, right: margin },
+                styles: { font: 'helvetica', fontSize: 8, cellPadding: 5, halign: 'center', valign: 'middle', lineColor: [203, 213, 225], lineWidth: 0.4 },
+                headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontSize: 7.5, fontStyle: 'bold' },
+                alternateRowStyles: { fillColor: [248, 250, 252] },
+                columnStyles: { 0: { halign: 'left', fontStyle: 'bold', cellWidth: 85 } },
+                didParseCell: function (data) {
+                    if (data.section !== 'body') return;
+                    const r = snap.rows[data.row.index];
+                    if (!r) return;
+                    if (data.column.index === 5) { data.cell.styles.fontStyle = 'bold'; data.cell.styles.textColor = [79, 70, 229]; }
+                    if (data.column.index === 7) { data.cell.styles.fontStyle = 'bold'; data.cell.styles.textColor = r.passed ? [5, 150, 105] : [220, 38, 38]; }
+                    if (data.column.index === 12) { data.cell.styles.fontStyle = 'bold'; data.cell.styles.textColor = r.isRefund ? [5, 150, 105] : [220, 38, 38]; }
+                }
+            });
+
+            const filename = 'Mess-Audit-' + getLocalDateString() + '.pdf';
+
+            // Published page: the viewer confirms the save. Opened as a local file: normal download.
+            let dl = null;
+            try {
+                if (window.claude && typeof window.claude.use === 'function') dl = await window.claude.use('downloads');
+            } catch (e) { dl = null; }
+
+            if (dl) {
+                try {
+                    await dl.save({ filename: filename, data: doc.output('arraybuffer') });
+                    showToast("PDF saved: " + filename, "fa-file-pdf");
+                } catch (err) {
+                    if (err && err.code === 'declined') showToast("Download cancelled.", "fa-circle-exclamation");
+                    else showToast("Could not save the PDF. Please try again.", "fa-circle-exclamation");
+                }
+            } else {
+                doc.save(filename);
+                showToast("PDF downloaded: " + filename, "fa-file-pdf");
+            }
+        }
+
+        function updateMemberAbsentDays(memberId, val) {
+            const member = state.members.find(m => m.id === memberId);
+            if (member) {
+                member.absentDays = Math.max(0, parseInt(val) || 0);
+                saveMembers();
+                renderAuditLedger();
+                showToast("Absent days updated.", "fa-user-pen");
+            }
+        }
+
+        function updateAuditCalculations() {
+            updateAuditSettings();
+        }
+
+        // ---------- Notepad (Tab 5) - standalone, not linked to any other data ----------
+        let noteSaveTimer = null;
+        let pendingNoteDelete = null;
+
+        function loadNotes() {
+            state.notes = [];
+            const raw = lsGet('mess_notes');
+            if (raw) {
+                try {
+                    const arr = JSON.parse(raw);
+                    if (Array.isArray(arr)) state.notes = arr;
+                } catch (e) {}
+            }
+        }
+
+        function saveNotesNow() {
+            if (noteSaveTimer) { clearTimeout(noteSaveTimer); noteSaveTimer = null; }
+            lsSet('mess_notes', JSON.stringify(state.notes || []));
+        }
+
+        function formatNoteTime(iso) {
+            const d = new Date(iso);
+            if (isNaN(d.getTime())) return '';
+            return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        }
+
+        function addNote() {
+            if (state.currentRole !== 'admin') {
+                showToast("Admin Mode Required to use the notepad.", "fa-shield-halved");
+                return;
+            }
+            state.notes.unshift({ id: Date.now(), title: '', text: '', updated: new Date().toISOString() });
+            saveNotesNow();
+            renderTab5();
+            const first = document.querySelector('#notesList textarea');
+            if (first) first.focus();
+        }
+
+        function onNoteInput(id, title, text) {
+            if (state.currentRole !== 'admin') return;
+            const note = state.notes.find(n => n.id === id);
+            if (!note) return;
+            note.title = title;
+            note.text = text;
+            note.updated = new Date().toISOString();
+
+            const status = document.getElementById('noteStatus-' + id);
+            if (status) status.innerText = 'Saving...';
+
+            if (noteSaveTimer) clearTimeout(noteSaveTimer);
+            noteSaveTimer = setTimeout(() => {
+                saveNotesNow();
+                const st = document.getElementById('noteStatus-' + id);
+                if (st) st.innerText = 'Saved ' + formatNoteTime(note.updated);
+            }, 400);
+        }
+
+        function deleteNote(id) {
+            if (state.currentRole !== 'admin') return;
+            if (pendingNoteDelete === id) {
+                state.notes = state.notes.filter(n => n.id !== id);
+                pendingNoteDelete = null;
+                saveNotesNow();
+                renderTab5();
+                showToast("Note deleted.", "fa-trash");
+                return;
+            }
+            pendingNoteDelete = id;
+            const btn = document.getElementById('noteDel-' + id);
+            if (btn) btn.innerHTML = '<i class="fa-solid fa-trash"></i> Click again to delete';
+            setTimeout(() => {
+                if (pendingNoteDelete === id) {
+                    pendingNoteDelete = null;
+                    const b = document.getElementById('noteDel-' + id);
+                    if (b) b.innerHTML = '<i class="fa-solid fa-trash"></i> Delete';
+                }
+            }, 3000);
+        }
+
+        function renderTab5() {
+            const list = document.getElementById('notesList');
+            if (!list) return;
+            list.innerHTML = '';
+            
+            if (!state.notes || state.notes.length === 0) {
+                list.innerHTML = '<p class="col-span-full text-xs text-slate-500 italic text-center py-8">No notes yet. Click "New Note" to start writing.</p>';
+                return;
+            }
+
+            state.notes.forEach(note => {
+                const card = document.createElement('div');
+                card.className = 'bg-slate-800/80 border border-slate-700/80 rounded-2xl p-4 shadow-lg space-y-3';
+                card.innerHTML =
+                    '<input type="text" maxlength="80" placeholder="Title" class="note-title w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm font-bold text-white focus:outline-none focus:ring-2 focus:ring-amber-500">' +
+                    '<textarea rows="8" placeholder="Write your note here..." class="note-text w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-slate-200 leading-relaxed focus:outline-none focus:ring-2 focus:ring-amber-500 resize-y"></textarea>' +
+                    '<div class="flex flex-wrap items-center justify-between gap-2">' +
+                        '<span id="noteStatus-' + note.id + '" class="text-[10px] text-slate-500">' + (note.updated ? 'Saved ' + formatNoteTime(note.updated) : '') + '</span>' +
+                        '<button type="button" id="noteDel-' + note.id + '" onclick="deleteNote(' + note.id + ')" class="text-[11px] font-bold text-slate-400 hover:text-rose-400 flex items-center gap-1.5"><i class="fa-solid fa-trash"></i> Delete</button>' +
+                    '</div>';
+
+                const titleEl = card.querySelector('.note-title');
+                const textEl = card.querySelector('.note-text');
+                titleEl.value = note.title || '';
+                textEl.value = note.text || '';
+                const handler = () => onNoteInput(note.id, titleEl.value, textEl.value);
+                titleEl.addEventListener('input', handler);
+                textEl.addEventListener('input', handler);
+
+                list.appendChild(card);
+            });
+        }
+
+        // ---------- Tab bar scrolling (arrows + mouse wheel) ----------
+        function updateNavArrows() {
+            const sc = document.getElementById('navScroller');
+            const l = document.getElementById('navArrowLeft');
+            const r = document.getElementById('navArrowRight');
+            if (!sc || !l || !r) return;
+            const canLeft = sc.scrollLeft > 4;
+            const canRight = sc.scrollLeft + sc.clientWidth < sc.scrollWidth - 4;
+            l.style.display = canLeft ? 'flex' : 'none';
+            r.style.display = canRight ? 'flex' : 'none';
+        }
+
+        function scrollNav(dir) {
+            const sc = document.getElementById('navScroller');
+            if (!sc) return;
+            sc.scrollBy({ left: dir * Math.max(140, sc.clientWidth * 0.6), behavior: 'smooth' });
+        }
+
+        function ensureActiveTabVisible(tabId) {
+            const sc = document.getElementById('navScroller');
+            const btn = document.getElementById('tabBtn-' + tabId);
+            if (!sc || !btn) return;
+            const left = btn.offsetLeft - sc.offsetLeft;
+            const right = left + btn.offsetWidth;
+            if (left < sc.scrollLeft + 8) sc.scrollTo({ left: Math.max(0, left - 16), behavior: 'smooth' });
+            else if (right > sc.scrollLeft + sc.clientWidth - 8) sc.scrollTo({ left: right - sc.clientWidth + 16, behavior: 'smooth' });
+        }
+
+        function initNavScroll() {
+            const sc = document.getElementById('navScroller');
+            if (!sc) return;
+            sc.addEventListener('scroll', updateNavArrows, { passive: true });
+            window.addEventListener('resize', updateNavArrows);
+            // mouse wheel scrolls the tabs sideways when they do not all fit
+            sc.addEventListener('wheel', function (e) {
+                if (sc.scrollWidth <= sc.clientWidth) return;
+                if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+                const atStart = sc.scrollLeft <= 0;
+                const atEnd = sc.scrollLeft + sc.clientWidth >= sc.scrollWidth - 1;
+                if ((e.deltaY < 0 && atStart) || (e.deltaY > 0 && atEnd)) return;
+                e.preventDefault();
+                sc.scrollLeft += e.deltaY;
+            }, { passive: false });
+            updateNavArrows();
+            setTimeout(updateNavArrows, 400);
+        }
+
+        function applyTab4Visibility() {
+            const btn4 = document.getElementById('tabBtn-tab4');
+            if (btn4) btn4.classList.toggle('hidden', state.currentRole !== 'admin');
+            const btn5 = document.getElementById('tabBtn-tab5');
+            if (btn5) btn5.classList.toggle('hidden', state.currentRole !== 'admin');
+            if (typeof updateNavArrows === 'function') setTimeout(updateNavArrows, 0);
+        }
+
+        function switchTab(tabId) {
+            if ((tabId === 'tab4' || tabId === 'tab5') && state.currentRole !== 'admin') tabId = 'tab1';
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.className = "tab-btn whitespace-nowrap px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all text-slate-400 hover:text-white hover:bg-slate-800";
+            });
+
+            const activeTab = document.getElementById(tabId);
+            if (activeTab) activeTab.classList.remove('hidden');
+
+            const activeBtn = document.getElementById(`tabBtn-${tabId}`);
+            if (activeBtn) activeBtn.className = "tab-btn whitespace-nowrap px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all bg-indigo-600 text-white shadow-md";
+            applyTab4Visibility();
+
+            renderAll();
+            if (tabId === 'tab5') renderTab5();
+            ensureActiveTabVisible(tabId);
+        }
+
+        function openMenuModal(initialDate) {
+            if (state.currentRole !== 'admin') {
+                showToast("Admin Mode Required to edit food menu.", "fa-shield-halved");
+                return;
+            }
+
+            const targetDate = (typeof initialDate === 'string' && initialDate) ? initialDate : (state.selectedMenuDate || getLocalDateString());
+            const datePicker = document.getElementById('modalMenuDatePicker');
+            if (datePicker) {
+                datePicker.value = targetDate;
+            }
+
+            loadModalMenuForDate(targetDate);
+            document.getElementById('menuModal').classList.remove('hidden');
+        }
+
+        function onModalMenuDateChange(newDate) {
+            if (!newDate) return;
+            loadModalMenuForDate(newDate);
+        }
+
+        function loadModalMenuForDate(dateStr) {
+            const existingMenu = state.menus[dateStr];
+            if (existingMenu) {
+                document.getElementById('modalBreakfastInput').value = existingMenu.breakfast || '';
+                document.getElementById('modalLunchInput').value = existingMenu.lunch || '';
+                document.getElementById('modalDinnerInput').value = existingMenu.dinner || '';
+            } else {
+                document.getElementById('modalBreakfastInput').value = "Khichuri & Boiled Egg";
+                document.getElementById('modalLunchInput').value = "Chicken Curry, Lentils & Steamed Rice";
+                document.getElementById('modalDinnerInput').value = "Fish Fry, Mixed Vegetables & Rice";
+            }
+        }
+
+        function closeMenuModal() {
+            document.getElementById('menuModal').classList.add('hidden');
+        }
+
+        function saveMenuModal(e) {
+            e.preventDefault();
+            const selectedDate = document.getElementById('modalMenuDatePicker').value || getLocalDateString();
+
+            const updatedMenu = {
+                breakfast: document.getElementById('modalBreakfastInput').value.trim(),
+                lunch: document.getElementById('modalLunchInput').value.trim(),
+                dinner: document.getElementById('modalDinnerInput').value.trim()
+            };
+
+            state.menus[selectedDate] = updatedMenu;
+            saveMenus();
+
+            state.selectedMenuDate = selectedDate;
+
+            closeMenuModal();
+            renderAll();
+            showToast(`Food menu updated for ${selectedDate}`, "fa-utensils");
+        }
+
+        function openAddMemberModal() {
+            document.getElementById('addMemberModal').classList.remove('hidden');
+        }
+
+        function closeAddMemberModal() {
+            document.getElementById('addMemberModal').classList.add('hidden');
+        }
+
+        function handleAddMemberSubmit(e) {
+            e.preventDefault();
+            const name = document.getElementById('addMemberNameInput').value.trim();
+            const room = document.getElementById('addMemberRoomInput').value.trim();
+            const deposit = parseFloat(document.getElementById('addMemberDepositInput').value) || 0;
+            const absentDays = parseInt(document.getElementById('addMemberAbsentInput').value) || 0;
+
+            if (!name || !room) return;
+
+            const newMember = {
+                id: 'm_' + Date.now(),
+                name: name,
+                room: room,
+                avatar: '',
+                deposit: deposit,
+                absentDays: absentDays
+            };
+
+            state.members.push(newMember);
+            saveMembers();
+            closeAddMemberModal();
+            document.getElementById('addMemberNameInput').value = '';
+            document.getElementById('addMemberRoomInput').value = '';
+            renderAll();
+            showToast(`Added member ${name}`, "fa-user-plus");
+        }
+
+        function openDeleteMemberModal(memberId) {
+            if (state.currentRole !== 'admin') return;
+            const member = state.members.find(m => m.id === memberId);
+            if (!member) return;
+
+            document.getElementById('deleteMemberTargetId').value = member.id;
+            document.getElementById('deleteMemberNameLabel').innerText = `Member: ${member.name}`;
+            document.getElementById('deleteMemberModal').classList.remove('hidden');
+        }
+
+        function closeDeleteMemberModal() {
+            document.getElementById('deleteMemberModal').classList.add('hidden');
+        }
+
+        function executeMemberDelete() {
+            const memberId = document.getElementById('deleteMemberTargetId').value;
+            const member = state.members.find(m => m.id === memberId);
+            if (member) {
+                state.members = state.members.filter(m => m.id !== memberId);
+                saveMembers();
+                closeDeleteMemberModal();
+                renderAll();
+                showToast(`Removed member ${member.name}`, "fa-user-minus");
+            }
+        }
+
+        function openDepositModal(memberId) {
+            const member = state.members.find(m => m.id === memberId);
+            if (!member) return;
+            document.getElementById('depositMemberId').value = member.id;
+            document.getElementById('depositModalMemberName').innerText = `Update Deposit: ${member.name}`;
+            document.getElementById('depositAmountInput').value = member.deposit;
+            document.getElementById('depositModal').classList.remove('hidden');
+        }
+
+        function closeDepositModal() {
+            document.getElementById('depositModal').classList.add('hidden');
+        }
+
+        function saveDepositModal() {
+            const memberId = document.getElementById('depositMemberId').value;
+            const amount = parseFloat(document.getElementById('depositAmountInput').value) || 0;
+            const member = state.members.find(m => m.id === memberId);
+            if (member) {
+                member.deposit = amount;
+                saveMembers();
+                closeDepositModal();
+                renderAll();
+                showToast("Deposit balance updated.", "fa-wallet");
+            }
+        }
+
+        function openResetConfirmModal() {
+            if (state.currentRole !== 'admin') {
+                showToast("Admin Mode Required to reset data.", "fa-shield-halved");
+                return;
+            }
+            document.getElementById('resetPwInput').value = '';
+            document.getElementById('resetPwError').innerText = '';
+            document.getElementById('resetConfirmModal').classList.remove('hidden');
+            setTimeout(() => document.getElementById('resetPwInput').focus(), 50);
+        }
+
+        function closeResetConfirmModal() {
+            document.getElementById('resetConfirmModal').classList.add('hidden');
+        }
+
+        async function executeDataReset() {
+            if (state.currentRole !== 'admin') {
+                closeResetConfirmModal();
+                showToast("Admin Mode Required to reset data.", "fa-shield-halved");
+                return;
+            }
+
+            const input = document.getElementById('resetPwInput');
+            const errEl = document.getElementById('resetPwError');
+            const pw = input.value;
+            if (!isValidPw(pw)) {
+                errEl.innerText = 'Enter the 7 digit admin password.';
+                return;
+            }
+            if ((await hashPw(pw)) !== (await getStoredPwHash())) {
+                errEl.innerText = 'Wrong password. Data was not reset.';
+                input.value = '';
+                input.focus();
+                return;
+            }
+
+            // keep the admin password, wipe everything else
+            const savedPw = lsGet('mess_admin_pw');
+            const savedNotes = lsGet('mess_notes');
+            lsClear();
+            if (savedPw) lsSet('mess_admin_pw', savedPw);
+            if (savedNotes) lsSet('mess_notes', savedNotes);
+            lsSet('mess_members_version', '2');
+            lsSet('mess_fahim_added', '1');
+            lsSet('mess_extra_custom_only', '1');
+
+            const today = getLocalDateString();
+            state.members = [];
+            state.extraSectors = {};
+            Object.keys(DEFAULT_EXTRA).forEach(k => { state.extraSectors[k] = 0; });
+            state.extraLabels = {};
+            state.meals = {};
+            state.menus = {};
+            state.bajar = [];
+            state.objections = [];
+            state.selectedMenuDate = today;
+            state.selectedCalendarDate = today;
+            state.selectedLeaderboardMonth = getLocalMonthKey(today);
+            loadAuditSettings();
+
+            saveMembers();
+            saveExtraSectorsData();
+            saveExtraLabelsData();
+            saveMeals();
+            saveMenus();
+            saveBajarData();
+            saveObjectionsData();
+
+            closeResetConfirmModal();
+            renderAll();
+            showToast("All data has been reset.", "fa-rotate-left");
+        }
+
+        function showToast(message, iconClass = "fa-circle-check") {
+            const toast = document.getElementById('toastNotification');
+            document.getElementById('toastMessage').innerText = message;
+            document.getElementById('toastIconWrap').innerHTML = `<i class="fa-solid ${iconClass} text-indigo-400 text-base"></i>`;
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 2800);
+        }
+
+        function startLiveClock() {
+            function updateClock() {
+                const now = new Date();
+                const clockEl = document.getElementById('liveClockDisplay');
+                if (clockEl) {
+                    clockEl.innerText = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                }
+            }
+            updateClock();
+            setInterval(updateClock, 1000);
+        }
+
+        function renderAll() {
+            calculateGlobalStats();
+            renderTab1();
+            renderTab2();
+            renderTab3();
+            renderAuditLedger();
+        }
+
+       window.onload = async function() {
+    try {
+        await loadFromSupabase(); // ক্লাউড থেকে ডাটা আনার চেষ্টা করবে
+    } catch (e) {
+        console.error("Supabase load failed, fallback to local:", e);
+    }
+    
+    // পেজের মূল ফাংশনগুলো যেন অবশ্যই চালু হয়
+    initData();
+    loadAuditSettings();
+    loadNotes();
+    initNavScroll();
+    window.addEventListener('pagehide', () => { if (notesSaveTimer) saveNotesNow(); });
+    startLiveClock();
+    renderAll();
+};
+    </script>
+</body>
+</html>
