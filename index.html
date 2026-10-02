@@ -885,6 +885,23 @@ function lsSet(key, val) {
     localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val));
     triggerAutoSave();
 }
+// --- Real-time Data Sync Listener ---
+supabaseClient
+  .channel('mess_data_changes')
+  .on(
+    'postgres_changes',
+    { event: '*', schema: 'public', table: 'mess_data' },
+    (payload) => {
+      if (payload.new && payload.new.data) {
+        const cloudData = payload.new.data;
+        Object.keys(cloudData).forEach((key) => {
+          localStorage.setItem(key, cloudData[key]);
+        });
+        location.reload(); // অন্য ফোন থেকে ডাটা চেঞ্জ হলে সাথে সাথে পেজ রিফ্রেশ হয়ে ডাটা আপডেট হবে
+      }
+    }
+  )
+  .subscribe();
         const DEFAULT_MEMBERS = [
             { id: 'n1', name: 'Fahim Islam Rahat', room: '-', avatar: '', deposit: 0, absentDays: 0 },
             { id: 'n2', name: 'Md Mehedi Hasan', room: '-', avatar: '', deposit: 0, absentDays: 0 },
