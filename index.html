@@ -1001,11 +1001,12 @@ supabaseClient
           localStorage.setItem(key, cloudData[key]);
         });
 
-        // Full page reload ছাড়া স্ক্রিনের ডাটা লাইভ আপডেট করার ফাংশন
+        // UI ও Feedback সেকশন ইনস্ট্যান্ট আপডেট
+        // UI & Feedback সেকশন ইনস্ট্যান্ট আপডেট
         if (typeof renderAll === 'function') renderAll();
-        else if (typeof renderUI === 'function') renderUI();
-        else if (typeof loadData === 'function') loadData();
-        else if (typeof init === 'function') init();
+        if (typeof renderUI === 'function') renderUI();
+        if (typeof renderTab2 === 'function') renderTab2(); // <-- আসল ফিডব্যাক রেন্ডার ফাংশন
+        if (typeof renderObjections === 'function') renderObjections();
       }
     }
   )
@@ -1991,7 +1992,7 @@ function lsSet(key, val) {
 
                 state.objections.unshift(newObj);
                 saveObjectionsData();
-                document.getElementById('commentTextInput').value = '';
+                triggerAutoSave();
                 const pinBox = document.getElementById('commentPinInput');
                 if (pinBox) pinBox.value = '';
                 renderTab2();
@@ -2005,8 +2006,8 @@ function lsSet(key, val) {
         function deleteObjection(id) {
             state.objections = state.objections.filter(o => o.id !== id);
             saveObjectionsData();
+            triggerAutoSave();
             renderTab2();
-            showToast("Objection deleted.", "fa-trash");
         }
 
         function renderMealMatrix() {
