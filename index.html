@@ -1000,20 +1000,16 @@ supabaseClient
         Object.keys(cloudData).forEach((key) => {
           localStorage.setItem(key, cloudData[key]);
         });
-        location.reload(); // Onno device theke update ashle auto-refresh hobe
+
+        // Full page reload ছাড়া স্ক্রিনের ডাটা লাইভ আপডেট করার ফাংশন
+        if (typeof renderAll === 'function') renderAll();
+        else if (typeof renderUI === 'function') renderUI();
+        else if (typeof loadData === 'function') loadData();
+        else if (typeof init === 'function') init();
       }
     }
   )
   .subscribe();
-// --- Auto-Sync & Debounce Setup ---
-let syncTimer = null;
-
-function triggerAutoSave() {
-    clearTimeout(syncTimer);
-    syncTimer = setTimeout(() => {
-        saveToSupabase();
-    }, 500);
-}
 
 function lsSet(key, val) {
     localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val));
