@@ -309,16 +309,13 @@
 
                         <div class="space-y-3 bg-slate-900/60 p-4 rounded-xl border border-slate-700/60">
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <div>
-                                    <label class="block text-[11px] font-semibold text-slate-400 mb-1">Member Posting:</label>
-                                    <select id="commentAuthorSelect" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"></select>
-                                </div>
+                                <div id="commentIdentityBox"></div>
                                 <div class="text-xs text-slate-400 flex items-center px-1">
                                     Target Date: <span id="commentDateNotice" class="font-bold text-indigo-400 ml-1.5">Today</span>
                                 </div>
                             </div>
                             <textarea id="commentTextInput" rows="2" placeholder="Lodge any issue or feedback regarding food quality, missing counts, or timing..." class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"></textarea>
-                            <button onclick="addObjectionComment()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md transition-all">
+                            <button id="postFeedbackBtn" onclick="addObjectionComment()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md transition-all">
                                 <i class="fa-solid fa-paper-plane"></i> Post Feedback
                             </button>
                         </div>
@@ -350,6 +347,24 @@
         <section id="tab3" class="tab-content hidden space-y-6">
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div class="lg:col-span-2 space-y-6">
+                    <!-- Admin only: monthly item-wise bajar sheet (PDF download only, not shown on the page) -->
+                    <div id="bajarSummaryCard" class="hidden bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 shadow-lg">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                                    <i class="fa-solid fa-table-list text-emerald-400"></i> Monthly Bajar Item Sheet
+                                </h3>
+                                <p class="text-[11px] text-slate-400 mt-1">Pick a month and download its item-wise bajar sheet as a PDF.</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <select id="bajarSummaryMonth" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"></select>
+                                <button type="button" onclick="downloadBajarSummaryPdf()" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md transition-all">
+                                    <i class="fa-solid fa-file-pdf"></i> Download PDF
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                     <div id="bajarEntryCard" class="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 shadow-lg space-y-4">
                         <div class="flex flex-wrap items-center justify-between gap-2">
                             <h3 class="text-base font-bold text-white flex items-center gap-2">
@@ -451,7 +466,7 @@
                                 <span>Total Extra Bills:</span>
                                 <span class="font-bold text-amber-400" id="statExtraSubtotal">৳ 0.00</span>
                             </div>
-                            <div class="flex justify-between text-xs text-slate-300 border-t border-slate-800 pt-2">
+                            <div id="grandTotalRow" class="flex justify-between text-xs text-slate-300 border-t border-slate-800 pt-2">
                                 <span class="font-bold text-white">Grand Mess Total:</span>
                                 <span class="font-black text-emerald-400" id="statGrandTotal">৳ 0.00</span>
                             </div>
@@ -460,6 +475,31 @@
                                 <span class="font-extrabold text-amber-300" id="statPerHeadExtra">৳ 0.00</span>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Admin only: Grand Mess Total minus member deposits -->
+                    <div id="depositDiffCard" class="hidden bg-slate-800/80 border border-emerald-500/30 rounded-2xl p-5 shadow-lg space-y-4">
+                        <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+                            <h3 class="text-base font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-wallet text-emerald-400"></i> Deposit Balance
+                            </h3>
+                            <span class="text-[10px] font-bold text-slate-400 uppercase bg-slate-900 px-2.5 py-1 rounded-full border border-slate-700">Admin Only</span>
+                        </div>
+                        <div class="bg-slate-900 p-4 rounded-xl border border-slate-700/80 space-y-2">
+                            <div class="flex justify-between text-xs text-slate-300">
+                                <span>Grand Mess Total:</span>
+                                <span class="font-bold text-emerald-400" id="statDiffGrandTotal">৳ 0.00</span>
+                            </div>
+                            <div class="flex justify-between text-xs text-slate-300">
+                                <span>Total Member Deposits:</span>
+                                <span class="font-bold text-indigo-400" id="statDiffDeposits">৳ 0.00</span>
+                            </div>
+                            <div class="flex justify-between text-xs text-slate-300 border-t border-slate-800 pt-2">
+                                <span class="font-bold text-white" id="statDiffLabel">Difference:</span>
+                                <span class="font-black text-amber-400" id="statDiffValue">৳ 0.00</span>
+                            </div>
+                        </div>
+                        <p class="text-[10px] text-slate-500">Difference = Grand Mess Total &minus; Total Member Deposits</p>
                     </div>
                 </div>
             </div>
@@ -663,6 +703,10 @@
                                         <input type="text" id="addMemberRoomInput" placeholder="e.g. Room 304" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 </div>
                 <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Unique ID <span class="text-slate-500 font-normal">(optional, auto-generated if empty)</span></label>
+                    <input type="text" id="addMemberCodeInput" maxlength="12" autocomplete="off" placeholder="e.g. RAHUL1" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono uppercase focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
                     <label class="block text-xs font-semibold text-slate-300 mb-1">Initial Deposit (৳)</label>
                     <input type="number" id="addMemberDepositInput" min="0" value="4000" step="100" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 </div>
@@ -676,6 +720,84 @@
                     <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md">Add Member</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Activate Profile Modal (member) -->
+    <div id="activateModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-slate-800 border border-indigo-500/30 rounded-2xl max-w-xs w-full p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+                <div>
+                    <h3 class="text-base font-bold text-white flex items-center gap-2"><i class="fa-solid fa-id-badge text-indigo-400"></i> Activate Profile</h3>
+                    <p class="text-xs text-slate-400" id="activateModalName">-</p>
+                </div>
+                <button onclick="closeActivateModal()" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <input type="hidden" id="activateMemberId">
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Unique ID</label>
+                    <input type="text" id="activateCodeInput" maxlength="12" autocomplete="off" autocapitalize="characters" placeholder="Shown on your profile card" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono uppercase focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Set a 4 digit password</label>
+                    <input type="password" id="activatePinInput" inputmode="numeric" maxlength="4" autocomplete="off" oninput="this.value=this.value.replace(/[^0-9]/g,'')" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-bold tracking-[0.5em] text-center focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Confirm password</label>
+                    <input type="password" id="activatePin2Input" inputmode="numeric" maxlength="4" autocomplete="off" oninput="this.value=this.value.replace(/[^0-9]/g,'')" onkeydown="if(event.key==='Enter'){submitActivateProfile();}" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-bold tracking-[0.5em] text-center focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <p class="text-[10px] text-slate-500">This device will be locked to you and can post feedback without asking again. On any other device you must enter your Unique ID + password every time. Nobody can see your password.</p>
+                <p id="activateError" class="text-[11px] text-rose-400 font-semibold min-h-[16px]"></p>
+            </div>
+            <div class="flex justify-end gap-2">
+                <button type="button" onclick="closeActivateModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold rounded-xl">Cancel</button>
+                <button type="button" id="activateBtn" onclick="submitActivateProfile()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md">Activate</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Member Profile Modal (Admin) -->
+    <div id="editMemberModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-user-pen text-indigo-400"></i> Edit Member Profile
+                </h3>
+                <button onclick="closeEditMemberModal()" class="text-slate-400 hover:text-white text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <input type="hidden" id="editMemberId">
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Member Name</label>
+                    <input type="text" id="editMemberNameInput" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Room No.</label>
+                    <input type="text" id="editMemberRoomInput" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Unique ID</label>
+                    <input type="text" id="editMemberCodeInput" maxlength="12" autocomplete="off" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono uppercase focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <p class="text-[10px] text-slate-500 mt-1">Shown to everyone. Members use it with their password to post feedback. 3-12 letters, numbers or hyphen.</p>
+                </div>
+                <div class="flex items-center justify-between gap-2 bg-slate-900/70 border border-slate-700/70 rounded-xl px-3 py-2">
+                    <div>
+                        <p class="text-[10px] uppercase tracking-wider font-extrabold text-slate-400">Feedback Password</p>
+                        <p class="text-xs font-semibold text-slate-300" id="editMemberPinStatus">-</p>
+                    </div>
+                    <button type="button" id="editMemberPinResetBtn" onclick="resetMemberPassword()" class="hidden px-3 py-1.5 bg-rose-500/15 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 rounded-xl text-[11px] font-bold transition-all">Reset Password</button>
+                </div>
+                <p id="editMemberError" class="text-[11px] text-rose-400 font-semibold min-h-[16px]"></p>
+            </div>
+
+            <div class="flex justify-end gap-2">
+                <button type="button" onclick="closeEditMemberModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold rounded-xl">Cancel</button>
+                <button type="button" onclick="saveEditMember()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md">Save Profile</button>
+            </div>
         </div>
     </div>
 
@@ -830,6 +952,7 @@
 
             if (data && data.data) {
                 Object.keys(data.data).forEach(key => {
+                    if (key.indexOf('device_') === 0) return; // never overwrite device-only data
                     localStorage.setItem(key, typeof data.data[key] === 'string' ? data.data[key] : JSON.stringify(data.data[key]));
                 });
             }
@@ -844,6 +967,7 @@
             const allLocalData = {};
             for (let i = 0; i < localStorage.length; i++) {
                 const k = localStorage.key(i);
+                if (k.indexOf('device_') === 0) continue; // device-only data (e.g. feedback device lock) is never synced
                 allLocalData[k] = localStorage.getItem(k);
             }
 
@@ -861,6 +985,7 @@ async function saveToSupabase() {
         const allLocalData = {};
         for (let i = 0; i < localStorage.length; i++) {
             const k = localStorage.key(i);
+            if (k.indexOf('device_') === 0) continue; // device-only data (e.g. feedback device lock) is never synced
             allLocalData[k] = localStorage.getItem(k);
         }
 
@@ -1080,6 +1205,8 @@ function lsSet(key, val) {
                 saveExtraLabelsData();
                 lsSet('mess_extra_custom_only', '1');
             }
+
+            ensureMemberCodes();
         }
 
         function saveMembers() { lsSet('mess_members', JSON.stringify(state.members)); }
@@ -1309,17 +1436,24 @@ function lsSet(key, val) {
                     '</div>';
             }
 
+            const pinMap = readMemberPins();
+            const deviceMember = getLinkedMember();
+
             state.members.forEach(member => {
                 const currentVal = Number((state.meals[mealDate] || {})[member.id] || 0);
+                const isActive = !!pinMap[member.id];
+                const isThisDevice = !!(deviceMember && deviceMember.id === member.id);
                 const avatarSrc = member.avatar || placeholderAvatar(member.name);
 
                 const card = document.createElement('div');
                 card.className = "bg-slate-800/90 border border-slate-700/80 rounded-2xl p-4 shadow-lg hover:border-slate-600 transition-all flex flex-col justify-between space-y-3";
 
                 const isAdmin = state.currentRole === 'admin';
-                const buttonStateClass = isAdmin
+                const canEditMember = isAdmin && isActive;
+                const buttonStateClass = canEditMember
                     ? "bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer shadow-md active:scale-95"
                     : "bg-slate-700/50 text-slate-500 cursor-not-allowed opacity-50";
+                const lockedTitle = isAdmin ? 'Locked until the member activates the profile' : 'Admin mode required to edit meals';
 
                 card.innerHTML = `
                     <div class="flex items-start justify-between gap-3">
@@ -1335,11 +1469,18 @@ function lsSet(key, val) {
                                     ${member.name}
                                 </h4>
                                 <p class="text-[11px] text-slate-400">${member.room}</p>
+                                <p class="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1"><i class="fa-solid fa-fingerprint text-indigo-400"></i> Unique ID: <span class="font-mono font-bold text-indigo-300 tracking-wider">${escapeHtml(member.code || '-')}</span></p>
+                                <div class="mt-1 flex flex-wrap items-center gap-1.5">
+                                    ${isActive
+                                        ? `<span class="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-full px-2 py-0.5"><i class="fa-solid fa-circle-check"></i> Active${isThisDevice ? ' (this device)' : ''}</span>`
+                                        : `<span class="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-full px-2 py-0.5"><i class="fa-solid fa-hourglass-half"></i> Not activated</span>`}
+                                    ${(!isActive && !deviceMember && state.currentRole !== 'admin') ? `<button onclick="openActivateModal('${member.id}')" class="text-[10px] font-bold text-white bg-indigo-600 hover:bg-indigo-500 rounded-full px-2.5 py-0.5 shadow-md transition-all">Activate Profile</button>` : ''}
+                                </div>
                             </div>
                         </div>
                         <input type="file" id="upload-${member.id}" class="hidden" accept="image/*" onchange="handlePhotoUpload(event, '${member.id}')">
 
-                        ${isAdmin ? `<button onclick="openDeleteMemberModal('${member.id}')" title="Delete Member" class="text-slate-500 hover:text-rose-400 p-1 transition-colors"><i class="fa-solid fa-user-minus text-xs"></i></button>` : ''}
+                        ${isAdmin ? `<div class="flex items-center gap-1"><button onclick="openEditMemberModal('${member.id}')" ${isActive ? '' : 'disabled'} title="${isActive ? 'Edit Profile' : 'Locked until the member activates the profile'}" class="p-1 transition-colors ${isActive ? 'text-slate-500 hover:text-indigo-400' : 'text-slate-600 opacity-40 cursor-not-allowed'}"><i class="fa-solid fa-user-pen text-xs"></i></button><button onclick="openDeleteMemberModal('${member.id}')" title="Delete Member" class="text-slate-500 hover:text-rose-400 p-1 transition-colors"><i class="fa-solid fa-user-minus text-xs"></i></button></div>` : ''}
                     </div>
 
                     <div class="bg-slate-900/90 p-3.5 rounded-2xl border border-slate-700/60 flex items-center justify-between">
@@ -1349,10 +1490,10 @@ function lsSet(key, val) {
                         </div>
 
                         <div class="flex items-center gap-2">
-                            <button onclick="adjustMeal('${member.id}', -0.5)" ${!isAdmin ? 'disabled' : ''} title="${isAdmin ? 'Decrease meal count' : 'Admin mode required to edit meals'}" class="w-10 h-10 rounded-xl font-black text-xs flex items-center justify-center transition-all ${buttonStateClass}">
+                            <button onclick="adjustMeal('${member.id}', -0.5)" ${!canEditMember ? 'disabled' : ''} title="${canEditMember ? 'Decrease meal count' : lockedTitle}" class="w-10 h-10 rounded-xl font-black text-xs flex items-center justify-center transition-all ${buttonStateClass}">
                                 -0.5
                             </button>
-                            <button onclick="adjustMeal('${member.id}', 0.5)" ${!isAdmin ? 'disabled' : ''} title="${isAdmin ? 'Increase meal count' : 'Admin mode required to edit meals'}" class="w-10 h-10 rounded-xl font-black text-xs flex items-center justify-center transition-all ${buttonStateClass}">
+                            <button onclick="adjustMeal('${member.id}', 0.5)" ${!canEditMember ? 'disabled' : ''} title="${canEditMember ? 'Increase meal count' : lockedTitle}" class="w-10 h-10 rounded-xl font-black text-xs flex items-center justify-center transition-all ${buttonStateClass}">
                                 +0.5
                             </button>
                         </div>
@@ -1361,8 +1502,11 @@ function lsSet(key, val) {
                     ${isAdmin ? `
                     <div class="flex items-center justify-between text-xs text-slate-400 pt-1 border-t border-slate-700/50">
                         <span>Deposit: <strong class="text-emerald-400 font-bold">৳ ${member.deposit}</strong></span>
-                        <button onclick="openDepositModal('${member.id}')" class="text-indigo-400 hover:underline text-[11px] font-bold">Edit Deposit</button>
-                    </div>` : ''}
+                        ${isActive
+                            ? `<button onclick="openDepositModal('${member.id}')" class="text-indigo-400 hover:underline text-[11px] font-bold">Edit Deposit</button>`
+                            : `<span class="text-slate-500 text-[11px] font-bold flex items-center gap-1" title="Locked until the member activates the profile"><i class="fa-solid fa-lock text-[10px]"></i> Locked</span>`}
+                    </div>
+                    ${isActive ? '' : `<p class="text-[10px] text-amber-400/80">Meal and deposit are locked until ${escapeHtml(member.name)} activates the profile.</p>`}` : ''}
                 `;
 
                 grid.appendChild(card);
@@ -1386,6 +1530,8 @@ function lsSet(key, val) {
                 showToast("Admin Mode Required to modify meal counts!", "fa-shield-halved");
                 return;
             }
+
+            if (!isMemberActive(memberId)) { warnMemberNotActive(memberId); return; }
 
             const mealDate = state.selectedMenuDate || getLocalDateString();
             if (!state.meals[mealDate]) state.meals[mealDate] = {};
@@ -1576,10 +1722,7 @@ function lsSet(key, val) {
             document.getElementById('calLunch').innerText = menu.lunch;
             document.getElementById('calDinner').innerText = menu.dinner;
 
-            const authorSelect = document.getElementById('commentAuthorSelect');
-            const prevAuthor = authorSelect.value;
-            authorSelect.innerHTML = state.members.map(m => `<option value="${m.id}">${m.name} (${m.room})</option>`).join('');
-            if (prevAuthor && state.members.some(m => m.id === prevAuthor)) authorSelect.value = prevAuthor;
+            renderCommentIdentity();
             document.getElementById('commentDateNotice').innerText = selDate;
 
             const objectionsForDate = state.objections.filter(o => o.date === selDate);
@@ -1598,10 +1741,10 @@ function lsSet(key, val) {
                     item.innerHTML = `
                         <div>
                             <div class="flex items-center gap-2 mb-1">
-                                <span class="text-xs font-bold text-amber-400">${author.name}</span>
+                                <span class="text-xs font-bold text-amber-400">${escapeHtml(author.name)}</span>
                                 <span class="text-[10px] text-slate-500 font-mono">${obj.timestamp}</span>
                             </div>
-                            <p class="text-xs text-slate-300">${obj.comment}</p>
+                            <p class="text-xs text-slate-300">${escapeHtml(obj.comment)}</p>
                         </div>
                         ${state.currentRole === 'admin' ? `<button onclick="deleteObjection(${obj.id})" class="text-slate-500 hover:text-rose-400 text-xs"><i class="fa-solid fa-trash"></i></button>` : ''}
                     `;
@@ -1623,30 +1766,235 @@ function lsSet(key, val) {
             renderTab2();
         }
 
-        function addObjectionComment() {
-            const authorId = document.getElementById('commentAuthorSelect').value;
+        // ---------- Member identity for feedback: Unique ID + 4 digit password, one device = one member ----------
+        const MEMBER_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        const DEVICE_LINK_KEY = 'device_member_link';   // device_* keys are never synced to the cloud
+        const DEVICE_FAIL_KEY = 'device_pin_fail';
+        const MAX_PIN_FAILS = 5;
+        const PIN_LOCK_MS = 10 * 60 * 1000;
+        let commentBusy = false;
+
+        function normalizeMemberCode(c) { return String(c || '').trim().toUpperCase(); }
+        function isValidMemberCode(c) { return /^[A-Z0-9-]{3,12}$/.test(c); }
+
+        function defaultMemberCode(id, taken) {
+            for (let salt = 0; salt < 1000; salt++) {
+                const str = String(id) + ':' + salt;
+                let h = 2166136261;
+                for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+                let code = '', x = h;
+                for (let i = 0; i < 5; i++) { code += MEMBER_CODE_CHARS[x % 32]; x = x >>> 5; }
+                if (!taken.has(code)) return code;
+            }
+            return 'M' + Date.now().toString(36).toUpperCase().slice(-5);
+        }
+
+        function ensureMemberCodes() {
+            const taken = new Set();
+            let changed = false;
+            state.members.forEach(m => {
+                const c = normalizeMemberCode(m.code);
+                if (isValidMemberCode(c) && !taken.has(c)) {
+                    taken.add(c);
+                    if (m.code !== c) { m.code = c; changed = true; }
+                } else {
+                    m.code = '';
+                }
+            });
+            state.members.forEach(m => {
+                if (!m.code) { m.code = defaultMemberCode(m.id, taken); taken.add(m.code); changed = true; }
+            });
+            if (changed) saveMembers();
+        }
+
+        function isMemberCodeTaken(code, exceptId) {
+            return state.members.some(m => m.id !== exceptId && normalizeMemberCode(m.code) === code);
+        }
+
+        // Password hashes live in their own synced key. Nobody (admin included) can read a password; only a salted hash is stored.
+        function readMemberPins() {
+            try {
+                const o = JSON.parse(lsGet('mess_member_pins') || '{}');
+                return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {};
+            } catch (e) { return {}; }
+        }
+        function writeMemberPins(o) { lsSet('mess_member_pins', JSON.stringify(o || {})); }
+        // A member counts as "active" once he/she has set a password. Until then the admin cannot edit meals, deposit or absent days.
+        function isMemberActive(memberId) { return !!readMemberPins()[memberId]; }
+        function warnMemberNotActive(memberId) {
+            const m = state.members.find(x => x.id === memberId);
+            showToast("Locked until " + (m ? m.name : "the member") + " activates the profile.", "fa-lock");
+        }
+
+        async function hashMemberPin(memberId, pin) {
+            const salted = 'mess-member-pin:' + memberId + ':' + pin;
+            try {
+                if (window.crypto && crypto.subtle) {
+                    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(salted));
+                    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+                }
+            } catch (e) {}
+            let h = 5381;
+            for (let i = 0; i < salted.length; i++) { h = ((h << 5) + h + salted.charCodeAt(i)) | 0; }
+            return 'f' + (h >>> 0).toString(16);
+        }
+
+        function getLinkedMember() {
+            let link = null;
+            try { link = JSON.parse(localStorage.getItem(DEVICE_LINK_KEY) || 'null'); } catch (e) { link = null; }
+            if (!link || !link.id) return null;
+            const member = state.members.find(m => m.id === link.id);
+            const pins = readMemberPins();
+            // The lock is only valid while the member exists and the password it was made with is still the current one
+            if (!member || !pins[member.id] || pins[member.id] !== link.h) {
+                try { localStorage.removeItem(DEVICE_LINK_KEY); } catch (e) {}
+                return null;
+            }
+            return member;
+        }
+
+        function setDeviceLink(memberId, hash) {
+            try { localStorage.setItem(DEVICE_LINK_KEY, JSON.stringify({ id: memberId, h: hash })); } catch (e) {}
+        }
+
+        function getPinLockRemainingMs() {
+            try {
+                const f = JSON.parse(localStorage.getItem(DEVICE_FAIL_KEY) || 'null');
+                if (f && f.until && f.until > Date.now()) return f.until - Date.now();
+            } catch (e) {}
+            return 0;
+        }
+        function registerPinFailure() {
+            let f = { n: 0, until: 0 };
+            try { f = JSON.parse(localStorage.getItem(DEVICE_FAIL_KEY) || 'null') || f; } catch (e) {}
+            f.n = (f.n || 0) + 1;
+            if (f.n >= MAX_PIN_FAILS) { f.until = Date.now() + PIN_LOCK_MS; f.n = 0; }
+            try { localStorage.setItem(DEVICE_FAIL_KEY, JSON.stringify(f)); } catch (e) {}
+        }
+        function clearPinFailures() { try { localStorage.removeItem(DEVICE_FAIL_KEY); } catch (e) {} }
+
+        function renderCommentIdentity() {
+            const box = document.getElementById('commentIdentityBox');
+            if (!box) return;
+            const linked = getLinkedMember();
+            const mode = linked ? ('linked:' + linked.id + ':' + linked.name + ':' + linked.code) : 'form';
+            if (box.dataset.mode === mode) return;   // keep what the person is typing
+            box.dataset.mode = mode;
+
+            if (linked) {
+                box.innerHTML = `
+                    <label class="block text-[11px] font-semibold text-slate-400 mb-1">Member Posting:</label>
+                    <div class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white">${escapeHtml(linked.name)}</div>`;
+            } else {
+                box.innerHTML = `
+                    <label class="block text-[11px] font-semibold text-slate-400 mb-1">Member Posting:</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" id="commentUniqueIdInput" maxlength="12" autocomplete="off" autocapitalize="characters" placeholder="Unique ID" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono uppercase focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <input type="password" id="commentPinInput" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="4 digit password" oninput="this.value=this.value.replace(/[^0-9]/g,'')" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-bold tracking-widest focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <p class="text-[10px] text-slate-500 mt-1">Enter your Unique ID + password to post from this device. To skip this on your own device, activate your profile on the Daily Meal Sheet page.</p>
+                    <p id="commentIdentityError" class="text-[11px] text-rose-400 font-semibold min-h-[16px]"></p>`;
+            }
+        }
+
+        function setCommentIdentityError(msg) {
+            const el = document.getElementById('commentIdentityError');
+            if (el) el.innerText = msg || '';
+            else if (msg) showToast(msg, "fa-circle-exclamation");
+        }
+
+        // Fetch only the given keys from the cloud copy (leaves all other local data untouched)
+        async function refreshKeysFromCloud(keys) {
+            try {
+                const { data, error } = await supabaseClient.from('mess_data').select('data').eq('id', 1).maybeSingle();
+                if (error || !data || !data.data) return;
+                keys.forEach(k => {
+                    if (typeof data.data[k] === 'string') { try { localStorage.setItem(k, data.data[k]); } catch (e) {} }
+                });
+            } catch (e) {}
+        }
+
+        // Pull the newest members / password hashes / comments from the cloud before checking or posting
+        async function refreshSharedForFeedback() {
+            await refreshKeysFromCloud(['mess_member_pins', 'mess_objections', 'mess_members']);
+            try {
+                const o = JSON.parse(lsGet('mess_objections') || 'null');
+                if (Array.isArray(o)) state.objections = o;
+            } catch (e) {}
+            try {
+                const m = JSON.parse(lsGet('mess_members') || 'null');
+                if (Array.isArray(m)) state.members = m;
+            } catch (e) {}
+        }
+
+        async function addObjectionComment() {
+            if (commentBusy) return;
             const text = document.getElementById('commentTextInput').value.trim();
             if (!text) {
                 showToast("Please enter feedback text.", "fa-circle-exclamation");
                 return;
             }
 
-            const now = new Date();
-            const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+            commentBusy = true;
+            const btn = document.getElementById('postFeedbackBtn');
+            if (btn) { btn.disabled = true; btn.classList.add('opacity-60'); }
 
-            const newObj = {
-                id: Date.now(),
-                date: state.selectedCalendarDate,
-                authorId: authorId,
-                comment: text,
-                timestamp: timeStr
-            };
+            try {
+                await refreshSharedForFeedback();
+                setCommentIdentityError('');
 
-            state.objections.unshift(newObj);
-            saveObjectionsData();
-            document.getElementById('commentTextInput').value = '';
-            renderTab2();
-            showToast("Feedback submitted.", "fa-paper-plane");
+                let author = getLinkedMember();
+
+                if (!author) {
+                    const codeIn = normalizeMemberCode((document.getElementById('commentUniqueIdInput') || {}).value);
+                    const pin = String((document.getElementById('commentPinInput') || {}).value || '');
+                    if (!codeIn) { setCommentIdentityError('Enter your Unique ID.'); return; }
+                    const member = state.members.find(m => normalizeMemberCode(m.code) === codeIn);
+                    if (!member) { setCommentIdentityError('Unique ID not found. Check the ID shown on your profile card.'); return; }
+                    if (!/^[0-9]{4}$/.test(pin)) { setCommentIdentityError('Enter a 4 digit password.'); return; }
+
+                    const pins = readMemberPins();
+                    if (!pins[member.id]) {
+                        setCommentIdentityError('This profile is not activated yet. Activate it on the Daily Meal Sheet page first.');
+                        return;
+                    }
+                    const wait = getPinLockRemainingMs();
+                    if (wait > 0) {
+                        setCommentIdentityError('Too many wrong attempts. Try again in ' + Math.ceil(wait / 60000) + ' min.');
+                        return;
+                    }
+                    const hash = await hashMemberPin(member.id, pin);
+                    if (pins[member.id] !== hash) {
+                        registerPinFailure();
+                        setCommentIdentityError('Wrong password for this Unique ID.');
+                        return;
+                    }
+                    clearPinFailures();
+                    author = member;   // other devices are not remembered: ID + password is needed every time
+                }
+
+                const now = new Date();
+                const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+                const newObj = {
+                    id: Date.now(),
+                    date: state.selectedCalendarDate,
+                    authorId: author.id,
+                    comment: text,
+                    timestamp: timeStr
+                };
+
+                state.objections.unshift(newObj);
+                saveObjectionsData();
+                document.getElementById('commentTextInput').value = '';
+                const pinBox = document.getElementById('commentPinInput');
+                if (pinBox) pinBox.value = '';
+                renderTab2();
+                showToast("Feedback submitted.", "fa-paper-plane");
+            } finally {
+                commentBusy = false;
+                if (btn) { btn.disabled = false; btn.classList.remove('opacity-60'); }
+            }
         }
 
         function deleteObjection(id) {
@@ -1749,6 +2097,11 @@ function lsSet(key, val) {
             const addBox = document.getElementById('extraBillAddBox');
             if (addBox) addBox.classList.toggle('hidden', !isAdminT3);
 
+            // Monthly item sheet is visible in Admin Mode only
+            const sumCard = document.getElementById('bajarSummaryCard');
+            if (sumCard) sumCard.classList.toggle('hidden', !isAdminT3);
+            if (isAdminT3) renderBajarSummary();
+
             renderExtraBills();
 
             const extraSubtotal = Object.values(state.extraSectors).reduce((a, v) => a + (Number(v) || 0), 0);
@@ -1761,6 +2114,35 @@ function lsSet(key, val) {
             document.getElementById('statExtraSubtotal').innerText = `৳ ${extraSubtotal.toFixed(2)}`;
             document.getElementById('statGrandTotal').innerText = `৳ ${grandTotal.toFixed(2)}`;
             document.getElementById('statPerHeadExtra').innerText = `৳ ${perHeadExtra.toFixed(2)}`;
+
+            // Grand Mess Total is visible in Admin Mode only
+            const grandRow = document.getElementById('grandTotalRow');
+            if (grandRow) grandRow.classList.toggle('hidden', !isAdminT3);
+
+            // Admin-only Deposit Balance: Grand Mess Total minus everything members have deposited
+            const depCard = document.getElementById('depositDiffCard');
+            if (depCard) depCard.classList.toggle('hidden', !isAdminT3);
+            if (isAdminT3) {
+                const totalDeposits = state.members.reduce((a, m) => a + (Number(m.deposit) || 0), 0);
+                const diff = grandTotal - totalDeposits;
+                const valEl = document.getElementById('statDiffValue');
+                const labelEl = document.getElementById('statDiffLabel');
+                document.getElementById('statDiffGrandTotal').innerText = `৳ ${grandTotal.toFixed(2)}`;
+                document.getElementById('statDiffDeposits').innerText = `৳ ${totalDeposits.toFixed(2)}`;
+                if (Math.abs(diff) < 0.005) {
+                    labelEl.innerText = 'Difference (Balanced):';
+                    valEl.innerText = '৳ 0.00';
+                    valEl.className = 'font-black text-slate-300';
+                } else if (diff > 0) {
+                    labelEl.innerText = 'Still to Collect:';
+                    valEl.innerText = `৳ ${diff.toFixed(2)}`;
+                    valEl.className = 'font-black text-rose-400';
+                } else {
+                    labelEl.innerText = 'Extra Deposited:';
+                    valEl.innerText = `৳ ${Math.abs(diff).toFixed(2)}`;
+                    valEl.className = 'font-black text-emerald-400';
+                }
+            }
         }
 
         const COMMON_BAJAR_ITEMS = [
@@ -1849,6 +2231,156 @@ function lsSet(key, val) {
                 ).join('');
             }
             updateBajarDraftTotal();
+        }
+
+        // ---------- Monthly Bajar Item Sheet (item-wise purchase count per month) ----------
+        function getBajarSummaryData(monthKey) {
+            const map = new Map();
+            COMMON_BAJAR_ITEMS.forEach(n => map.set(n.toLowerCase(), { name: n, custom: false, count: 0, amount: 0, unknown: 0, days: [] }));
+            const customMap = new Map(); // custom item name -> times bought
+            const customRow = { name: 'Custom Items', custom: true, count: 0, amount: 0, unknown: 0, days: [], detail: '' };
+
+            state.bajar.filter(b => getLocalMonthKey(b.date) === monthKey).forEach(b => {
+                const hasLines = Array.isArray(b.lines) && b.lines.length > 0;
+                const lines = hasLines
+                    ? b.lines.map(l => ({ name: String(l.name || '').trim(), amount: Number(l.amount) || 0, known: true }))
+                    : String(b.items || '').split(',').map(x => ({ name: x.trim(), amount: 0, known: false }));
+                lines.forEach(l => {
+                    if (!l.name) return;
+                    const key = l.name.toLowerCase();
+                    const e = map.has(key) ? map.get(key) : customRow;
+                    if (e === customRow) {
+                        const c = customMap.get(key) || { name: l.name, n: 0 };
+                        c.n += 1;
+                        customMap.set(key, c);
+                    }
+                    e.count += 1;
+                    e.amount += l.amount;
+                    if (!l.known) e.unknown += 1;
+                    const day = String(b.date).slice(8, 10);
+                    if (day && !e.days.includes(day)) e.days.push(day);
+                });
+            });
+
+            customRow.detail = Array.from(customMap.values())
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map(c => c.name + ' (' + c.n + ')')
+                .join(', ');
+
+            const rows = Array.from(map.values()).concat([customRow]);
+            rows.forEach(r => r.days.sort());
+            return rows;
+        }
+
+        function bajarSummaryMonthLabel(monthKey) {
+            const parts = monthKey.split('-').map(Number);
+            return new Date(parts[0], parts[1] - 1, 1).toLocaleString('en-US', { month: 'long', year: 'numeric' });
+        }
+
+        function renderBajarSummary() {
+            const sel = document.getElementById('bajarSummaryMonth');
+            if (!sel) return;
+
+            const currentKey = getLocalMonthKey(getLocalDateString());
+            const monthSet = new Set([currentKey]);
+            state.bajar.forEach(b => { if (b.date) monthSet.add(getLocalMonthKey(b.date)); });
+            const months = Array.from(monthSet).sort().reverse();
+
+            const prev = sel.value;
+            sel.innerHTML = months.map(m => `<option value="${m}">${bajarSummaryMonthLabel(m)}</option>`).join('');
+            sel.value = months.includes(prev) ? prev : currentKey;
+        }
+
+        async function downloadBajarSummaryPdf() {
+            if (state.currentRole !== 'admin') {
+                showToast("Admin Mode Required to download the PDF.", "fa-shield-halved");
+                return;
+            }
+            if (!window.jspdf || !window.jspdf.jsPDF) {
+                showToast("PDF library could not load. Check your internet connection.", "fa-circle-exclamation");
+                return;
+            }
+
+            const sel = document.getElementById('bajarSummaryMonth');
+            const monthKey = (sel && sel.value) || getLocalMonthKey(getLocalDateString());
+            const rows = getBajarSummaryData(monthKey);
+            const label = bajarSummaryMonthLabel(monthKey);
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+            const pageW = doc.internal.pageSize.getWidth();
+            const margin = 30;
+
+            doc.setFillColor(15, 23, 42);
+            doc.rect(0, 0, pageW, 62, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(18);
+            doc.text('Monthly Bajar Item Sheet', margin, 30);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(186, 200, 220);
+            doc.text(label + '    |    Generated: ' + new Date().toLocaleString('en-US'), margin, 48);
+
+            let totalCount = 0, totalAmount = 0;
+            const body = rows.map((r, i) => {
+                totalCount += r.count;
+                totalAmount += r.amount;
+                const bought = r.count > 0;
+                return [
+                    String(i + 1),
+                    r.custom ? (r.name + (r.detail ? '\n' + r.detail : '')) : r.name,
+                    bought ? String(r.count) : '-',
+                    !bought ? '-' : (r.unknown === r.count ? '-' : r.amount.toFixed(2))
+                ];
+            });
+            body.push(['', 'Total', String(totalCount), totalAmount.toFixed(2)]);
+            const lastRow = body.length - 1;
+
+            doc.autoTable({
+                startY: 80,
+                head: [['#', 'Item', 'Times Bought', 'Total Amount (Tk)']],
+                body: body,
+                theme: 'grid',
+                margin: { left: margin, right: margin },
+                styles: { font: 'helvetica', fontSize: 8.5, cellPadding: 5, halign: 'center', valign: 'middle', lineColor: [203, 213, 225], lineWidth: 0.4 },
+                headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold' },
+                alternateRowStyles: { fillColor: [248, 250, 252] },
+                columnStyles: { 0: { cellWidth: 28 }, 1: { halign: 'left', fontStyle: 'bold', cellWidth: 200 } },
+                didParseCell: function (data) {
+                    if (data.section !== 'body') return;
+                    if (data.row.index === lastRow) {
+                        data.cell.styles.fontStyle = 'bold';
+                        data.cell.styles.fillColor = [226, 232, 240];
+                        return;
+                    }
+                    const r = rows[data.row.index];
+                    if (!r) return;
+                    if (r.count === 0) data.cell.styles.textColor = [148, 163, 184];
+                    else if (data.column.index === 2) { data.cell.styles.fontStyle = 'bold'; data.cell.styles.textColor = [5, 150, 105]; }
+                    else if (data.column.index === 3) { data.cell.styles.textColor = [217, 119, 6]; }
+                }
+            });
+
+            const filename = 'Bajar-Items-' + monthKey + '.pdf';
+
+            let dl = null;
+            try {
+                if (window.claude && typeof window.claude.use === 'function') dl = await window.claude.use('downloads');
+            } catch (e) { dl = null; }
+
+            if (dl) {
+                try {
+                    await dl.save({ filename: filename, data: doc.output('arraybuffer') });
+                    showToast("PDF saved: " + filename, "fa-file-pdf");
+                } catch (err) {
+                    if (err && err.code === 'declined') showToast("Download cancelled.", "fa-circle-exclamation");
+                    else showToast("Could not save the PDF. Please try again.", "fa-circle-exclamation");
+                }
+            } else {
+                doc.save(filename);
+                showToast("PDF downloaded: " + filename, "fa-file-pdf");
+            }
         }
 
         function handleAddBajar(e) {
@@ -2044,6 +2576,7 @@ function lsSet(key, val) {
 
         function updateMemberDeposit(memberId, val) {
             if (state.currentRole !== 'admin') return;
+            if (!isMemberActive(memberId)) { warnMemberNotActive(memberId); renderAuditLedger(); return; }
             const member = state.members.find(m => m.id === memberId);
             if (member) {
                 member.deposit = Math.max(0, parseFloat(val) || 0);
@@ -2149,13 +2682,15 @@ function lsSet(key, val) {
                     ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 whitespace-nowrap">&#10003; Passed (+' + fmtNum(r.diff) + ')</span>'
                     : '<span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-500/20 text-rose-400 border border-rose-500/30 whitespace-nowrap">&#10007; Deficit (-' + fmtNum(Math.abs(r.diff)) + ')</span>';
 
-                const absentCell = isAdmin
+                const memberActive = isMemberActive(member.id);
+                const lockedHint = '<i class="fa-solid fa-lock text-[9px] text-slate-500 ml-1" title="Locked until the member activates the profile"></i>';
+                const absentCell = (isAdmin && memberActive)
                     ? '<input type="number" min="0" max="' + cycleDays + '" value="' + r.absentDays + '" onchange="updateMemberAbsentDays(\'' + member.id + '\', this.value)" class="w-14 bg-slate-900 border border-slate-700 text-center rounded-lg text-xs py-1 text-amber-400 font-black">'
-                    : '<span class="font-black text-amber-400">' + r.absentDays + '</span>';
+                    : '<span class="font-black text-amber-400">' + r.absentDays + '</span>' + (isAdmin ? lockedHint : '');
 
-                const depositCell = isAdmin
+                const depositCell = (isAdmin && memberActive)
                     ? '<input type="number" min="0" step="100" value="' + deposit + '" onchange="updateMemberDeposit(\'' + member.id + '\', this.value)" class="w-24 bg-slate-900 border border-slate-700 text-right rounded-lg text-xs py-1 px-2 text-emerald-400 font-bold">'
-                    : '<span class="font-bold text-emerald-400">৳ ' + deposit.toFixed(2) + '</span>';
+                    : '<span class="font-bold text-emerald-400">৳ ' + deposit.toFixed(2) + '</span>' + (isAdmin ? lockedHint : '');
 
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-slate-800/50";
@@ -2276,6 +2811,71 @@ function lsSet(key, val) {
                 }
             });
 
+            // ---- Full-month meal history (same data as the Calendar & Feedback matrix), added at the end of the PDF ----
+            (function addMealHistoryToPdf() {
+                const selDate = state.selectedCalendarDate || getLocalDateString();
+                const parts = selDate.split('-').map(Number);
+                const yy = parts[0], mm = parts[1];
+                const daysInMonth = new Date(yy, mm, 0).getDate();
+                const monthKey = yy + '-' + String(mm).padStart(2, '0');
+                const monthLabel = new Date(yy, mm - 1, 1).toLocaleString('en-US', { month: 'long', year: 'numeric' });
+
+                const dates = [];
+                for (let d = 1; d <= daysInMonth; d++) dates.push(monthKey + '-' + String(d).padStart(2, '0'));
+
+                doc.addPage();
+
+                // Title band (same style as page 1)
+                doc.setFillColor(15, 23, 42);
+                doc.rect(0, 0, pageW, 50, 'F');
+                doc.setTextColor(255, 255, 255);
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(16);
+                doc.text('Historical Date-Wise Meal Log Matrix', margin, 30);
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(9);
+                doc.setTextColor(186, 200, 220);
+                doc.text(monthLabel + '  (' + dates[0] + ' to ' + dates[dates.length - 1] + ')', pageW - margin, 30, { align: 'right' });
+
+                const mhHead = [['Member'].concat(dates.map(d => d.slice(8)), ['Total'])];
+                const dateTotals = dates.map(() => 0);
+                let grand = 0;
+                const mhBody = state.members.map(member => {
+                    let rowTotal = 0;
+                    const cells = dates.map((d, idx) => {
+                        const c = Number((state.meals[d] || {})[member.id] || 0);
+                        rowTotal += c;
+                        dateTotals[idx] += c;
+                        return c > 0 ? c.toFixed(1) : '-';
+                    });
+                    grand += rowTotal;
+                    return [member.name].concat(cells, [rowTotal > 0 ? rowTotal.toFixed(1) : '-']);
+                });
+                mhBody.push(['Day Total'].concat(dateTotals.map(t => t > 0 ? t.toFixed(1) : '-'), [grand.toFixed(1)]));
+
+                const lastCol = dates.length + 1;
+                const lastRow = mhBody.length - 1;
+                doc.autoTable({
+                    startY: 66,
+                    head: mhHead,
+                    body: mhBody,
+                    theme: 'grid',
+                    margin: { left: margin, right: margin },
+                    styles: { font: 'helvetica', fontSize: 6.5, cellPadding: 2.5, halign: 'center', valign: 'middle', lineColor: [203, 213, 225], lineWidth: 0.4 },
+                    headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontSize: 6.5, fontStyle: 'bold' },
+                    alternateRowStyles: { fillColor: [248, 250, 252] },
+                    columnStyles: { 0: { halign: 'left', fontStyle: 'bold', cellWidth: 80 }, [lastCol]: { fontStyle: 'bold', cellWidth: 34 } },
+                    didParseCell: function (data) {
+                        if (data.section === 'body' && data.column.index === lastCol) data.cell.styles.textColor = [217, 119, 6];
+                        if (data.section === 'body' && data.row.index === lastRow) {
+                            data.cell.styles.fontStyle = 'bold';
+                            data.cell.styles.fillColor = [226, 232, 240];
+                            if (data.column.index !== 0 && data.column.index !== lastCol) data.cell.styles.textColor = [5, 150, 105];
+                        }
+                    }
+                });
+            })();
+
             const filename = 'Mess-Audit-' + getLocalDateString() + '.pdf';
 
             // Published page: the viewer confirms the save. Opened as a local file: normal download.
@@ -2299,6 +2899,7 @@ function lsSet(key, val) {
         }
 
         function updateMemberAbsentDays(memberId, val) {
+            if (!isMemberActive(memberId)) { warnMemberNotActive(memberId); renderAuditLedger(); return; }
             const member = state.members.find(m => m.id === memberId);
             if (member) {
                 member.absentDays = Math.max(0, parseInt(val) || 0);
@@ -2573,10 +3174,20 @@ function lsSet(key, val) {
 
             if (!name || !room) return;
 
+            const newId = 'm_' + Date.now();
+            let code = normalizeMemberCode(document.getElementById('addMemberCodeInput').value);
+            if (code) {
+                if (!isValidMemberCode(code)) { showToast("Unique ID must be 3-12 letters, numbers or hyphen.", "fa-circle-exclamation"); return; }
+                if (isMemberCodeTaken(code, null)) { showToast("This Unique ID is already used by another member.", "fa-circle-exclamation"); return; }
+            } else {
+                code = defaultMemberCode(newId, new Set(state.members.map(m => normalizeMemberCode(m.code))));
+            }
+
             const newMember = {
-                id: 'm_' + Date.now(),
+                id: newId,
                 name: name,
                 room: room,
+                code: code,
                 avatar: '',
                 deposit: deposit,
                 absentDays: absentDays
@@ -2587,8 +3198,141 @@ function lsSet(key, val) {
             closeAddMemberModal();
             document.getElementById('addMemberNameInput').value = '';
             document.getElementById('addMemberRoomInput').value = '';
+            document.getElementById('addMemberCodeInput').value = '';
             renderAll();
             showToast(`Added member ${name}`, "fa-user-plus");
+        }
+
+        function openActivateModal(memberId) {
+            const m = state.members.find(x => x.id === memberId);
+            if (!m) return;
+            if (getLinkedMember()) { showToast("This device is already locked to a profile.", "fa-lock"); return; }
+            document.getElementById('activateMemberId').value = m.id;
+            document.getElementById('activateModalName').innerText = m.name;
+            document.getElementById('activateCodeInput').value = '';
+            document.getElementById('activatePinInput').value = '';
+            document.getElementById('activatePin2Input').value = '';
+            document.getElementById('activateError').innerText = '';
+            document.getElementById('activateModal').classList.remove('hidden');
+            setTimeout(() => document.getElementById('activateCodeInput').focus(), 50);
+        }
+
+        function closeActivateModal() {
+            document.getElementById('activateModal').classList.add('hidden');
+        }
+
+        let activateBusy = false;
+        async function submitActivateProfile() {
+            if (activateBusy) return;
+            const errEl = document.getElementById('activateError');
+            const memberId = document.getElementById('activateMemberId').value;
+            const code = normalizeMemberCode(document.getElementById('activateCodeInput').value);
+            const pin = document.getElementById('activatePinInput').value;
+            const pin2 = document.getElementById('activatePin2Input').value;
+
+            if (state.currentRole === 'admin') { errEl.innerText = 'Switch to User Mode to activate a profile.'; return; }
+            if (getLinkedMember()) { errEl.innerText = 'This device is already locked to a profile.'; return; }
+
+            activateBusy = true;
+            const btn = document.getElementById('activateBtn');
+            btn.disabled = true; btn.classList.add('opacity-60');
+            try {
+                await refreshKeysFromCloud(['mess_member_pins', 'mess_members']);
+                try { const m = JSON.parse(lsGet('mess_members') || 'null'); if (Array.isArray(m)) state.members = m; } catch (e) {}
+
+                const member = state.members.find(x => x.id === memberId);
+                if (!member) { errEl.innerText = 'This profile no longer exists.'; return; }
+                if (!code) { errEl.innerText = 'Enter your Unique ID.'; return; }
+                if (normalizeMemberCode(member.code) !== code) { errEl.innerText = 'Unique ID does not match this profile.'; return; }
+                if (!/^[0-9]{4}$/.test(pin)) { errEl.innerText = 'Password must be exactly 4 digits.'; return; }
+                if (pin !== pin2) { errEl.innerText = 'The two passwords do not match.'; return; }
+
+                const pins = readMemberPins();
+                if (pins[member.id]) {
+                    errEl.innerText = 'This profile is already activated on another device.';
+                    renderAll();
+                    return;
+                }
+                const hash = await hashMemberPin(member.id, pin);
+                pins[member.id] = hash;
+                writeMemberPins(pins);
+                setDeviceLink(member.id, hash);
+                closeActivateModal();
+                renderAll();
+                showToast("Profile activated. This device is now locked to " + member.name + ".", "fa-lock");
+            } finally {
+                activateBusy = false;
+                btn.disabled = false; btn.classList.remove('opacity-60');
+            }
+        }
+
+        let editPinResetArmed = false;
+
+        function openEditMemberModal(memberId) {
+            if (state.currentRole !== 'admin') return;
+            const m = state.members.find(x => x.id === memberId);
+            if (!m) return;
+            if (!readMemberPins()[m.id]) { showToast("Locked until " + m.name + " activates the profile.", "fa-lock"); return; }
+            document.getElementById('editMemberId').value = m.id;
+            document.getElementById('editMemberNameInput').value = m.name || '';
+            document.getElementById('editMemberRoomInput').value = m.room || '';
+            document.getElementById('editMemberCodeInput').value = m.code || '';
+            document.getElementById('editMemberError').innerText = '';
+            editPinResetArmed = false;
+            refreshEditMemberPinUi();
+            document.getElementById('editMemberModal').classList.remove('hidden');
+        }
+
+        function closeEditMemberModal() {
+            document.getElementById('editMemberModal').classList.add('hidden');
+        }
+
+        function refreshEditMemberPinUi() {
+            const id = document.getElementById('editMemberId').value;
+            const has = !!readMemberPins()[id];
+            document.getElementById('editMemberPinStatus').innerText = has ? 'Set (hidden, nobody can see it)' : 'Not set yet';
+            const btn = document.getElementById('editMemberPinResetBtn');
+            btn.classList.toggle('hidden', !has);
+            btn.innerText = editPinResetArmed ? 'Click again to confirm' : 'Reset Password';
+        }
+
+        async function resetMemberPassword() {
+            if (state.currentRole !== 'admin') return;
+            const id = document.getElementById('editMemberId').value;
+            if (!readMemberPins()[id]) return;
+            if (!editPinResetArmed) { editPinResetArmed = true; refreshEditMemberPinUi(); return; }
+            await refreshKeysFromCloud(['mess_member_pins']);   // don't overwrite passwords other members set meanwhile
+            const pins = readMemberPins();
+            delete pins[id];
+            writeMemberPins(pins);
+            editPinResetArmed = false;
+            closeEditMemberModal();
+            renderAll();
+            showToast("Password reset. The profile is not activated until the member activates it again.", "fa-key");
+        }
+
+        function saveEditMember() {
+            if (state.currentRole !== 'admin') return;
+            const id = document.getElementById('editMemberId').value;
+            const m = state.members.find(x => x.id === id);
+            if (!m) return;
+            if (!readMemberPins()[m.id]) { closeEditMemberModal(); return; }
+            const errEl = document.getElementById('editMemberError');
+            const name = document.getElementById('editMemberNameInput').value.trim();
+            const room = document.getElementById('editMemberRoomInput').value.trim();
+            const code = normalizeMemberCode(document.getElementById('editMemberCodeInput').value);
+
+            if (!name || !room) { errEl.innerText = 'Name and Room No. are required.'; return; }
+            if (!isValidMemberCode(code)) { errEl.innerText = 'Unique ID must be 3-12 letters, numbers or hyphen.'; return; }
+            if (isMemberCodeTaken(code, id)) { errEl.innerText = 'This Unique ID is already used by another member.'; return; }
+
+            m.name = name;
+            m.room = room;
+            m.code = code;
+            saveMembers();
+            closeEditMemberModal();
+            renderAll();
+            showToast("Profile updated.", "fa-user-pen");
         }
 
         function openDeleteMemberModal(memberId) {
@@ -2611,6 +3355,10 @@ function lsSet(key, val) {
             if (member) {
                 state.members = state.members.filter(m => m.id !== memberId);
                 saveMembers();
+                refreshKeysFromCloud(['mess_member_pins']).then(() => {
+                    const pinsAfterDelete = readMemberPins();
+                    if (pinsAfterDelete[memberId]) { delete pinsAfterDelete[memberId]; writeMemberPins(pinsAfterDelete); }
+                });
                 closeDeleteMemberModal();
                 renderAll();
                 showToast(`Removed member ${member.name}`, "fa-user-minus");
@@ -2620,6 +3368,7 @@ function lsSet(key, val) {
         function openDepositModal(memberId) {
             const member = state.members.find(m => m.id === memberId);
             if (!member) return;
+            if (!isMemberActive(memberId)) { warnMemberNotActive(memberId); return; }
             document.getElementById('depositMemberId').value = member.id;
             document.getElementById('depositModalMemberName').innerText = `Update Deposit: ${member.name}`;
             document.getElementById('depositAmountInput').value = member.deposit;
@@ -2634,6 +3383,7 @@ function lsSet(key, val) {
             const memberId = document.getElementById('depositMemberId').value;
             const amount = parseFloat(document.getElementById('depositAmountInput').value) || 0;
             const member = state.members.find(m => m.id === memberId);
+            if (member && !isMemberActive(memberId)) { closeDepositModal(); warnMemberNotActive(memberId); return; }
             if (member) {
                 member.deposit = amount;
                 saveMembers();
@@ -2710,6 +3460,7 @@ function lsSet(key, val) {
             saveMenus();
             saveBajarData();
             saveObjectionsData();
+            writeMemberPins({});   // all feedback passwords are wiped: members must set Unique ID + password again
 
             closeResetConfirmModal();
             renderAll();
