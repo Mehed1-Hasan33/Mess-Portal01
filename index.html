@@ -962,40 +962,49 @@
     }
 
     // 2. Data save haoyar shathe shathe Supabase-e pathanor function
-    async function saveToSupabase() {
-        try {
-            const allLocalData = {};
-            for (let i = 0; i < localStorage.length; i++) {
-                const k = localStorage.key(i);
-                if (k.indexOf('device_') === 0) continue; // device-only data (e.g. feedback device lock) is never synced
-                allLocalData[k] = localStorage.getItem(k);
-            }
-
-            await supabaseClient
-                .from('mess_data')
-                .upsert({ id: 1, data: allLocalData });
-        } catch (err) {
-            console.error('Supabase save error:', err);
-        }
-    }
-
-// ২. ডাটা সেভ হওয়ার সাথে সাথে সুপাবেসে পাঠানোর ফাংশন
 async function saveToSupabase() {
-    try {
-        const allLocalData = {};
-        for (let i = 0; i < localStorage.length; i++) {
-            const k = localStorage.key(i);
-            if (k.indexOf('device_') === 0) continue; // device-only data (e.g. feedback device lock) is never synced
-            allLocalData[k] = localStorage.getItem(k);
-        }
-
-        await supabaseClient
-            .from('mess_data')
-            .upsert({ id: 1, data: allLocalData });
-    } catch (err) {
-        console.error('Supabase save error:', err);
+  try {
+    const allLocalData = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k.indexOf('device_') === 0) continue; // device-only data
+      allLocalData[k] = localStorage.getItem(k);
     }
+
+    await supabaseClient
+      .from('mess_data')
+      .upsert({ id: 1, data: allLocalData });
+  } catch (err) {
+    console.error('Supabase save error:', err);
+  }
 }
+
+// --- Auto-Sync & Debounce Setup ---
+
+function triggerAutoSave() {
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => {
+    saveToSupabase();
+  }, 500);
+}
+
+// --- Real-time Data Sync Listener ---
+supabaseClient
+  .channel('mess_data_changes')
+  .on(
+    'postgres_changes',
+    { event: '*', schema: 'public', table: 'mess_data' },
+    (payload) => {
+      if (payload.new && payload.new.data) {
+        const cloudData = payload.new.data;
+        Object.keys(cloudData).forEach((key) => {
+          localStorage.setItem(key, cloudData[key]);
+        });
+        location.reload(); // Onno device theke update ashle auto-refresh hobe
+      }
+    }
+  )
+  .subscribe();
 // --- Auto-Sync & Debounce Setup ---
 let syncTimer = null;
 
