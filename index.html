@@ -994,7 +994,7 @@
         }
     }
 
-    // 2. Data save haoyar shathe shathe Supabase-e pathanor function
+   // 2. Data save haoyar shathe shathe Supabase-e pathanor function
 async function saveToSupabase() {
   try {
     const allLocalData = {};
@@ -1021,8 +1021,6 @@ function triggerAutoSave() {
     saveToSupabase();
   }, 500);
 }
-
-
 // --- Real-time Data Sync Listener ---
 supabaseClient
   .channel('mess_data_changes')
@@ -1036,6 +1034,7 @@ supabaseClient
           localStorage.setItem(key, cloudData[key]);
         });
 
+        // UI & Feedback সেকশন ইনস্ট্যান্ট আপডেট
         if (typeof renderAll === 'function') renderAll();
         if (typeof renderUI === 'function') renderUI();
         if (typeof renderTab2 === 'function') renderTab2(); // <-- আসল ফিডব্যাক রেন্ডার ফাংশন
@@ -1546,6 +1545,12 @@ function lsSet(key, val) {
                             : `<span class="text-slate-500 text-[11px] font-bold flex items-center gap-1" title="Locked until the member activates the profile"><i class="fa-solid fa-lock text-[10px]"></i> Locked</span>`}
                     </div>
                     ${isActive ? '' : `<p class="text-[10px] text-amber-400/80">Meal and deposit are locked until ${escapeHtml(member.name)} activates the profile.</p>`}` : ''}
+
+                    ${(!isAdmin && isThisDevice) ? `
+                    <div class="flex items-center justify-between text-xs text-slate-400 pt-1 border-t border-slate-700/50">
+                        <span class="flex items-center gap-1.5"><i class="fa-solid fa-wallet text-emerald-400"></i> Your Deposit: <strong class="text-emerald-400 font-bold">৳ ${Number(member.deposit || 0)}</strong></span>
+                        <span class="text-[10px] text-slate-500">Only you can see this</span>
+                    </div>` : ''}
                 `;
 
                 grid.appendChild(card);
