@@ -834,11 +834,11 @@
         </div>
     </div>
 
-    <!-- Edit Deposit Modal -->
+    <!-- Deposit History Modal (Admin): every deposit with its date -->
     <div id="depositModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
-        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-xs w-full p-6 shadow-2xl space-y-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div class="flex items-center justify-between border-b border-slate-700 pb-3">
-                <h3 class="text-base font-bold text-white" id="depositModalMemberName">Update Deposit</h3>
+                <h3 class="text-base font-bold text-white" id="depositModalMemberName">Deposits</h3>
                 <button onclick="closeDepositModal()" class="text-slate-400 hover:text-white text-lg">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
@@ -847,15 +847,57 @@
             <div class="space-y-3">
                 <input type="hidden" id="depositMemberId">
                 <div>
-                    <label class="block text-xs font-semibold text-slate-300 mb-1">Total Deposit Amount (৳)</label>
-                    <input type="number" id="depositAmountInput" min="0" step="100" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold">
+                    <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Deposit history</p>
+                    <div id="depositHistoryList" class="rounded-xl border border-slate-700 overflow-hidden"></div>
                 </div>
 
-                <div class="flex justify-end gap-2 pt-2">
-                    <button type="button" onclick="closeDepositModal()" class="px-3 py-2 bg-slate-700 text-slate-200 text-xs font-bold rounded-xl">Cancel</button>
-                    <button type="button" onclick="saveDepositModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md">Update</button>
+                <div class="bg-slate-900/60 p-3 rounded-xl border border-dashed border-indigo-500/40 space-y-2">
+                    <p class="text-[11px] font-bold text-indigo-400 uppercase tracking-wider">Add a deposit</p>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] font-semibold text-slate-400 mb-1">Date</label>
+                            <input type="date" id="depositDateInput" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-semibold text-slate-400 mb-1">Amount (৳)</label>
+                            <input type="number" id="depositAmountInput" min="1" step="100" onkeydown="if(event.key==='Enter'){saveDepositModal();}" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-2 text-xs text-white font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                    </div>
+                    <button type="button" onclick="saveDepositModal()" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md flex items-center justify-center gap-1.5"><i class="fa-solid fa-plus"></i> Add Deposit</button>
+                </div>
+
+                <div class="flex justify-end">
+                    <button type="button" onclick="closeDepositModal()" class="px-4 py-2 bg-slate-700 text-slate-200 text-xs font-bold rounded-xl">Close</button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- My Deposits & Meals (the member's own device only) -->
+    <div id="myDetailsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-slate-800 border border-indigo-500/30 rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+                <div>
+                    <h3 class="text-base font-bold text-white flex items-center gap-2"><i class="fa-solid fa-clock-rotate-left text-indigo-400"></i> My Deposits &amp; Meals</h3>
+                    <p class="text-xs text-slate-400" id="myDetailsName">-</p>
+                </div>
+                <button onclick="closeMyDetails()" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <input type="hidden" id="myDetailsMemberId">
+
+            <div>
+                <p class="text-[11px] font-bold text-emerald-400 uppercase tracking-wider mb-1.5"><i class="fa-solid fa-wallet"></i> Deposit history</p>
+                <div id="myDepositList" class="rounded-xl border border-slate-700 overflow-hidden"></div>
+            </div>
+
+            <div>
+                <div class="flex items-center justify-between gap-2 mb-1.5">
+                    <p class="text-[11px] font-bold text-indigo-400 uppercase tracking-wider"><i class="fa-solid fa-bowl-rice"></i> Meals by date</p>
+                    <select id="myMealMonth" onchange="renderMyDetails()" class="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-[11px] text-white font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"></select>
+                </div>
+                <div id="myMealList" class="rounded-xl border border-slate-700 overflow-hidden"></div>
+            </div>
+            <p class="text-[10px] text-slate-500">Only you can see this on your own device.</p>
         </div>
     </div>
 
@@ -1827,14 +1869,14 @@
 
                     ${isAdmin ? `
                     <div class="flex items-center justify-between text-xs text-slate-400 pt-1 border-t border-slate-700/50">
-                        <span>Deposit: <strong class="text-emerald-400 font-bold">৳ ${member.deposit}</strong></span>
-                        <button onclick="openDepositModal('${member.id}')" class="text-indigo-400 hover:underline text-[11px] font-bold">Edit Deposit</button>
+                        <span>Deposit: <strong class="text-emerald-400 font-bold">৳ ${memberDeposit(member)}</strong></span>
+                        <button onclick="openDepositModal('${member.id}')" class="text-indigo-400 hover:underline text-[11px] font-bold">Deposits</button>
                     </div>` : ''}
 
                     ${(!isAdmin && isThisDevice) ? `
                     <div class="flex items-center justify-between text-xs text-slate-400 pt-1 border-t border-slate-700/50">
-                        <span class="flex items-center gap-1.5"><i class="fa-solid fa-wallet text-emerald-400"></i> Your Deposit: <strong class="text-emerald-400 font-bold">৳ ${Number(member.deposit || 0)}</strong></span>
-                        <span class="text-[10px] text-slate-500">Only you can see this</span>
+                        <span class="flex items-center gap-1.5"><i class="fa-solid fa-wallet text-emerald-400"></i> Your Deposit: <strong class="text-emerald-400 font-bold">৳ ${memberDeposit(member)}</strong></span>
+                        <button onclick="openMyDetails('${member.id}')" class="text-indigo-400 hover:underline text-[11px] font-bold">View history</button>
                     </div>` : ''}
                 `;
 
@@ -2539,7 +2581,7 @@
             const depCard = document.getElementById('depositDiffCard');
             if (depCard) depCard.classList.toggle('hidden', !isAdminT3);
             if (isAdminT3) {
-                const totalDeposits = state.members.reduce((a, m) => a + (Number(m.deposit) || 0), 0);
+                const totalDeposits = state.members.reduce((a, m) => a + memberDeposit(m), 0);
                 const diff = grandTotal - totalDeposits;
                 const valEl = document.getElementById('statDiffValue');
                 const labelEl = document.getElementById('statDiffLabel');
@@ -2994,8 +3036,14 @@
             if (state.currentRole !== 'admin') return;
             const member = state.members.find(m => m.id === memberId);
             if (member) {
-                member.deposit = Math.max(0, parseFloat(val) || 0);
-                saveMembers();
+                // the total is the sum of dated deposits, so a changed total is saved as a dated adjustment
+                const newTotal = Math.max(0, parseFloat(val) || 0);
+                const diff = Math.round((newTotal - memberDeposit(member)) * 100) / 100;
+                if (diff !== 0) {
+                    ensureDepositLog(member).push({ id: newDepositId(), date: getLocalDateString(), amount: diff, note: 'Adjustment' });
+                    member.deposit = memberDeposit(member);
+                    saveMembers();
+                }
                 renderAll();
                 showToast("Deposit updated.", "fa-wallet");
             }
@@ -3068,7 +3116,7 @@
                 const member = r.member;
                 const mealCost = r.billableMeals * mealRate;
                 const totalExpense = mealCost + perHeadExtra;
-                const deposit = Number(member.deposit || 0);
+                const deposit = memberDeposit(member);
                 const balance = deposit - totalExpense;
 
                 const isRefund = balance >= 0;
@@ -3603,6 +3651,7 @@
                 code: code,
                 avatar: '',
                 deposit: deposit,
+                depositLog: deposit > 0 ? [{ id: 'd_' + newId, date: getLocalDateString(), amount: deposit, note: 'Initial deposit' }] : [],
                 absentDays: absentDays
             };
 
@@ -3784,13 +3833,68 @@
             }
         }
 
+        // ---------- Deposits with dates ----------
+        // A member's deposit is the sum of dated entries (depositLog). Old members that only have a single number get it as an "Opening balance".
+        function memberDeposit(m) {
+            if (m && Array.isArray(m.depositLog)) return Math.round(m.depositLog.reduce((sum, e) => sum + (Number(e.amount) || 0), 0) * 100) / 100;
+            return Number(m && m.deposit) || 0;
+        }
+
+        function ensureDepositLog(m) {
+            if (!Array.isArray(m.depositLog)) {
+                m.depositLog = [];
+                const legacy = Number(m.deposit) || 0;
+                if (legacy !== 0) m.depositLog.push({ id: 'open-' + m.id, date: '', amount: legacy, note: 'Opening balance' });
+            }
+            return m.depositLog;
+        }
+
+        function newDepositId() { return 'd_' + Date.now() + '_' + Math.floor(Math.random() * 1000); }
+
+        function fmtDateShort(d) {
+            if (!d) return '-';
+            const p = String(d).split('-');
+            if (p.length !== 3) return String(d);
+            const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            return p[2] + ' ' + (names[parseInt(p[1], 10) - 1] || p[1]) + ' ' + p[0];
+        }
+
+        function depositRowsHtml(m, withDelete) {
+            const log = Array.isArray(m.depositLog) ? m.depositLog.slice() : (Number(m.deposit) ? [{ id: 'open-' + m.id, date: '', amount: Number(m.deposit), note: 'Opening balance' }] : []);
+            log.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || String(b.id).localeCompare(String(a.id)));
+            if (log.length === 0) return '<p class="text-xs text-slate-500 italic text-center py-4">No deposits recorded yet.</p>';
+            const rows = log.map(e => {
+                const amt = Number(e.amount) || 0;
+                const armed = withDelete && depositDeleteArmed === e.id;
+                return '<div class="flex items-center justify-between gap-2 px-3 py-2 border-b border-slate-700/60 last:border-b-0 text-xs">' +
+                    '<div><span class="font-bold text-white">' + escapeHtml(fmtDateShort(e.date)) + '</span>' +
+                        (e.note ? ' <span class="text-[10px] text-slate-500">' + escapeHtml(e.note) + '</span>' : '') + '</div>' +
+                    '<div class="flex items-center gap-2"><span class="font-black ' + (amt < 0 ? 'text-rose-400' : 'text-emerald-400') + '">' + (amt < 0 ? '-' : '') + '৳ ' + Math.abs(amt).toFixed(2) + '</span>' +
+                    (withDelete ? '<button type="button" onclick="deleteDepositEntry(\'' + m.id + '\', \'' + String(e.id).replace(/'/g, '') + '\')" class="text-[10px] font-bold ' + (armed ? 'text-rose-300' : 'text-slate-500 hover:text-rose-400') + '">' + (armed ? 'Click again' : '<i class="fa-solid fa-trash"></i>') + '</button>' : '') +
+                    '</div></div>';
+            }).join('');
+            return rows + '<div class="flex items-center justify-between px-3 py-2 bg-slate-900/80 text-xs"><span class="font-bold text-slate-300">Total deposit</span><span class="font-black text-emerald-400">৳ ' + memberDeposit(m).toFixed(2) + '</span></div>';
+        }
+
+        let depositDeleteArmed = null;
+
+        function renderDepositModalHistory(memberId) {
+            const m = state.members.find(x => x.id === memberId);
+            const box = document.getElementById('depositHistoryList');
+            if (!m || !box) return;
+            box.innerHTML = depositRowsHtml(m, true);
+        }
+
         function openDepositModal(memberId) {
             if (state.currentRole !== 'admin') return;
             const member = state.members.find(m => m.id === memberId);
             if (!member) return;
+            depositDeleteArmed = null;
             document.getElementById('depositMemberId').value = member.id;
-            document.getElementById('depositModalMemberName').innerText = `Update Deposit: ${member.name}`;
-            document.getElementById('depositAmountInput').value = member.deposit;
+            document.getElementById('depositModalMemberName').innerText = `Deposits: ${member.name}`;
+            document.getElementById('depositAmountInput').value = '';
+            document.getElementById('depositDateInput').value = getLocalDateString();
+            renderDepositModalHistory(member.id);
             document.getElementById('depositModal').classList.remove('hidden');
         }
 
@@ -3799,17 +3903,84 @@
         }
 
         function saveDepositModal() {
+            if (state.currentRole !== 'admin') return;
             const memberId = document.getElementById('depositMemberId').value;
-            const amount = parseFloat(document.getElementById('depositAmountInput').value) || 0;
+            const amount = Math.round((parseFloat(document.getElementById('depositAmountInput').value) || 0) * 100) / 100;
+            const date = document.getElementById('depositDateInput').value || getLocalDateString();
+            const member = state.members.find(m => m.id === memberId);
+            if (!member) return;
+            if (!(amount > 0)) { showToast("Enter an amount greater than 0.", "fa-circle-exclamation"); return; }
+            ensureDepositLog(member).push({ id: newDepositId(), date: date, amount: amount, note: '' });
+            member.deposit = memberDeposit(member);
+            saveMembers();
+            document.getElementById('depositAmountInput').value = '';
+            renderDepositModalHistory(memberId);
+            renderAll();
+            showToast("Deposit added.", "fa-wallet");
+        }
+
+        function deleteDepositEntry(memberId, entryId) {
             if (state.currentRole !== 'admin') return;
             const member = state.members.find(m => m.id === memberId);
-            if (member) {
-                member.deposit = amount;
-                saveMembers();
-                closeDepositModal();
-                renderAll();
-                showToast("Deposit balance updated.", "fa-wallet");
+            if (!member) return;
+            if (depositDeleteArmed !== entryId) {                    // first click only arms the delete
+                depositDeleteArmed = entryId;
+                renderDepositModalHistory(memberId);
+                setTimeout(() => { if (depositDeleteArmed === entryId) { depositDeleteArmed = null; renderDepositModalHistory(memberId); } }, 3000);
+                return;
             }
+            depositDeleteArmed = null;
+            ensureDepositLog(member);
+            member.depositLog = member.depositLog.filter(e => String(e.id).replace(/'/g, '') !== entryId);
+            member.deposit = memberDeposit(member);
+            saveMembers();
+            renderDepositModalHistory(memberId);
+            renderAll();
+            showToast("Deposit entry deleted.", "fa-trash");
+        }
+
+        // ---------- The member's own view: deposits and meals by date ----------
+        function openMyDetails(memberId) {
+            const linked = getLinkedMember();
+            if (!linked || linked.id !== memberId) return;            // only on the device that is locked to this member
+            document.getElementById('myDetailsMemberId').value = memberId;
+            document.getElementById('myDetailsName').innerText = linked.name;
+            document.getElementById('myMealMonth').innerHTML = '';
+            renderMyDetails();
+            document.getElementById('myDetailsModal').classList.remove('hidden');
+        }
+
+        function closeMyDetails() {
+            document.getElementById('myDetailsModal').classList.add('hidden');
+        }
+
+        function renderMyDetails() {
+            const memberId = document.getElementById('myDetailsMemberId').value;
+            const linked = getLinkedMember();
+            if (!linked || linked.id !== memberId) { closeMyDetails(); return; }
+            const m = state.members.find(x => x.id === memberId) || linked;
+
+            document.getElementById('myDepositList').innerHTML = depositRowsHtml(m, false);
+
+            const entries = Object.keys(state.meals).map(d => ({ date: d, count: Number((state.meals[d] || {})[memberId] || 0) })).filter(x => x.count > 0);
+            const currentKey = getLocalMonthKey(getLocalDateString());
+            const monthSet = new Set([currentKey]);
+            entries.forEach(e => monthSet.add(getLocalMonthKey(e.date)));
+            const months = Array.from(monthSet).sort().reverse();
+            const sel = document.getElementById('myMealMonth');
+            const prev = sel.value;
+            sel.innerHTML = months.map(k => `<option value="${k}">${getMonthNameFormatted(k)}</option>`).join('');
+            sel.value = months.includes(prev) ? prev : currentKey;
+
+            const inMonth = entries.filter(e => getLocalMonthKey(e.date) === sel.value).sort((a, b) => b.date.localeCompare(a.date));
+            const monthTotal = inMonth.reduce((sum, e) => sum + e.count, 0);
+            const allTotal = entries.reduce((sum, e) => sum + e.count, 0);
+            const rows = inMonth.length === 0
+                ? '<p class="text-xs text-slate-500 italic text-center py-4">No meals recorded in this month.</p>'
+                : inMonth.map(e => '<div class="flex items-center justify-between px-3 py-2 border-b border-slate-700/60 last:border-b-0 text-xs"><span class="font-bold text-white">' + escapeHtml(fmtDateShort(e.date)) + '</span><span class="font-black text-indigo-400">' + e.count.toFixed(1) + ' meal' + (e.count === 1 ? '' : 's') + '</span></div>').join('');
+            document.getElementById('myMealList').innerHTML = rows +
+                '<div class="flex items-center justify-between px-3 py-2 bg-slate-900/80 text-xs"><span class="font-bold text-slate-300">This month</span><span class="font-black text-indigo-400">' + monthTotal.toFixed(1) + '</span></div>' +
+                '<div class="flex items-center justify-between px-3 py-2 bg-slate-900/80 text-xs border-t border-slate-700/60"><span class="font-bold text-slate-300">All time</span><span class="font-black text-amber-400">' + allTotal.toFixed(1) + '</span></div>';
         }
 
         function openResetConfirmModal() {
