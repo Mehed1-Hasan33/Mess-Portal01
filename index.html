@@ -967,87 +967,378 @@
     // Initialize Supabase Client
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // --- Supabase Cloud Storage Functions ---
+    // --- Supabase Cloud Storage Functions (merge based, safe for many admins at the same time) ---
+    //
+    // Every device keeps a copy of the last cloud data it saw ("syncBase"). When something is saved, the newest cloud data is
+    // fetched first and the changes of THIS device are merged into it (3-way merge), so two admins changing things at the
+    // same time no longer overwrite each other. Meal counts are merged by adding the changes together.
+    // The write is only accepted by the database if nobody else saved in the meantime (revision check), otherwise it retries.
 
-    // 1. Page load haoyar shomoy Supabase theke data load korar function
-    async function loadFromSupabase() {
+    const SYNC_TABLE = 'mess_data';
+    const syncBase = {};          // key -> the cloud value (string) this device knows
+    let syncRev = 0;              // last cloud revision this device has seen
+    let hasSynced = false;        // true after one successful contact with the cloud
+    let syncSaving = false;
+    let syncPending = false;
+    let syncTimer = null;
+    let revCheckBroken = false;   // true if the database does not support the revision check (falls back to plain upsert)
+    let appReady = false;
+
+    function isSyncKey(k) { return !!k && k.indexOf('device_') !== 0 && k.charAt(0) !== '_'; }
+
+    function rawGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+    function rawSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+    function rawRemove(k) { try { localStorage.removeItem(k); } catch (e) {} }
+    function localSyncKeys() {
+        const keys = [];
         try {
-            const { data, error } = await supabaseClient
-                .from('mess_data')
-                .select('data')
-                .eq('id', 1)
-                .maybeSingle();
-
-            if (error) {
-                console.error('Supabase load error:', error);
-                return;
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (isSyncKey(k)) keys.push(k);
             }
+        } catch (e) {}
+        return keys;
+    }
 
-            if (data && data.data) {
-                Object.keys(data.data).forEach(key => {
-                    if (key.indexOf('device_') === 0) return; // never overwrite device-only data
-                    localStorage.setItem(key, typeof data.data[key] === 'string' ? data.data[key] : JSON.stringify(data.data[key]));
-                });
+    // ---- merge helpers ----
+    function stableStringify(v) {
+        if (v === null || typeof v !== 'object') return JSON.stringify(v);
+        if (Array.isArray(v)) return '[' + v.map(stableStringify).join(',') + ']';
+        return '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + stableStringify(v[k])).join(',') + '}';
+    }
+    function jsonEq(a, b) { return stableStringify(a) === stableStringify(b); }
+    function isPlainObj(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
+    function isIdList(a) { return Array.isArray(a) && a.every(x => isPlainObj(x) && x.id !== undefined && x.id !== null); }
+
+    // 3-way merge of two edited copies (L = this device, R = cloud) of the same original (B)
+    function merge3(B, L, R, opt) {
+        const additive = !!(opt && opt.additive);
+        // When counts are added together, two copies that look equal can still be two separate additions of the same amount
+        if (!additive && jsonEq(L, R)) return L;
+        if (B !== undefined && jsonEq(L, B)) return R;      // only the cloud changed
+        if (B !== undefined && jsonEq(R, B)) return L;      // only this device changed
+
+        if (isPlainObj(L) && isPlainObj(R)) {
+            const Bo = isPlainObj(B) ? B : {};
+            const out = {};
+            const keys = new Set(Object.keys(L).concat(Object.keys(R)));
+            keys.forEach(k => {
+                const inL = Object.prototype.hasOwnProperty.call(L, k);
+                const inR = Object.prototype.hasOwnProperty.call(R, k);
+                const inB = Object.prototype.hasOwnProperty.call(Bo, k);
+                if (inL && inR) { out[k] = merge3(inB ? Bo[k] : undefined, L[k], R[k], opt); return; }
+                if (!inL && inR) {                              // removed on this device
+                    if (inB && jsonEq(R[k], Bo[k])) return;     // cloud did not touch it -> stays removed
+                    out[k] = R[k]; return;                      // cloud changed it -> keep the change
+                }
+                if (inL && !inR) {                              // removed in the cloud
+                    if (inB && jsonEq(L[k], Bo[k])) return;
+                    out[k] = L[k];
+                }
+            });
+            return out;
+        }
+
+        if (isIdList(L) && isIdList(R)) {
+            const Bl = isIdList(B) ? B : [];
+            const Bm = new Map(Bl.map(x => [x.id, x]));
+            const Lm = new Map(L.map(x => [x.id, x]));
+            const Rm = new Map(R.map(x => [x.id, x]));
+            const result = [];
+            R.forEach(r => {
+                if (!Lm.has(r.id)) {
+                    if (Bm.has(r.id) && jsonEq(r, Bm.get(r.id))) return;   // deleted on this device
+                    result.push(r); return;
+                }
+                result.push(merge3(Bm.get(r.id), Lm.get(r.id), r, opt));
+            });
+            const added = [];
+            L.forEach(l => {
+                if (Rm.has(l.id)) return;
+                if (Bm.has(l.id) && jsonEq(l, Bm.get(l.id))) return;       // deleted in the cloud
+                added.push(l);
+            });
+            return (opt && opt.addAt === 'end') ? result.concat(added) : added.concat(result);
+        }
+
+        if (opt && opt.additive && typeof L === 'number' && typeof R === 'number') {
+            const b = typeof B === 'number' ? B : 0;
+            return Math.max(0, Math.round((R + (L - b)) * 1000) / 1000);   // both admins' changes are added together
+        }
+        return L;                                                          // same value edited twice: the device that saves wins
+    }
+
+    // merge one stored key (values are JSON strings)
+    function mergeKeyValue(key, Bs, Ls, Rs) {
+        if (Ls === Rs && !(key === 'mess_meals' && Bs !== undefined && Ls !== Bs)) return Rs;
+        if (Rs === undefined) return Ls;
+        if (Bs !== undefined && Ls === Bs) return Rs;
+        if (Bs !== undefined && Rs === Bs) return Ls;
+        let L, R, B;
+        try { L = JSON.parse(Ls); R = JSON.parse(Rs); } catch (e) { return Ls; }
+        try { B = (Bs === undefined) ? undefined : JSON.parse(Bs); } catch (e) { B = undefined; }
+        if (B === undefined) B = (key === 'mess_meals') ? R : (Array.isArray(L) ? [] : (isPlainObj(L) ? {} : undefined));
+        const merged = merge3(B, L, R, { additive: key === 'mess_meals', addAt: key === 'mess_members' ? 'end' : 'front' });
+        return JSON.stringify(merged);
+    }
+
+    // ---- cloud access ----
+    async function fetchCloudRow() {
+        const { data, error } = await supabaseClient.from(SYNC_TABLE).select('data').eq('id', 1).maybeSingle();
+        if (error) throw error;
+        const values = {};
+        let rev = 0;
+        if (data && data.data && typeof data.data === 'object') {
+            rev = Number(data.data._rev) || 0;
+            Object.keys(data.data).forEach(k => {
+                if (k.charAt(0) === '_') return;
+                const v = data.data[k];
+                values[k] = (typeof v === 'string') ? v : JSON.stringify(v);
+            });
+        }
+        return { exists: !!(data && data.data), rev: rev, values: values };
+    }
+
+    async function writeCloud(mergedValues, remote) {
+        const payload = Object.assign({}, mergedValues, { _rev: remote.rev + 1 });
+        try {
+            if (!remote.exists) {
+                const { error } = await supabaseClient.from(SYNC_TABLE).insert({ id: 1, data: payload });
+                if (error) { if (error.code === '23505') return 'conflict'; throw error; }
+                return 'ok';
             }
+            if (!revCheckBroken) {
+                let q = supabaseClient.from(SYNC_TABLE).update({ data: payload }).eq('id', 1);
+                q = remote.rev === 0 ? q.is('data->>_rev', null) : q.eq('data->>_rev', String(remote.rev));
+                const { data: rows, error } = await q.select('id');
+                if (!error) return (rows && rows.length > 0) ? 'ok' : 'conflict';
+                console.warn('Revision check not available, using plain upsert:', error);
+                revCheckBroken = true;
+            }
+            const { error } = await supabaseClient.from(SYNC_TABLE).upsert({ id: 1, data: payload });
+            if (error) throw error;
+            return 'ok';
         } catch (err) {
-            console.error('Sync error:', err);
+            console.error('Supabase save error:', err);
+            return 'error';
         }
     }
 
-   // 2. Data save haoyar shathe shathe Supabase-e pathanor function
-async function saveToSupabase() {
-  try {
-    const allLocalData = {};
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k.indexOf('device_') === 0) continue; // device-only data
-      allLocalData[k] = localStorage.getItem(k);
+    // 1. Page load: Supabase theke data load korar function (the cloud is the truth when the page opens)
+    async function loadFromSupabase() {
+        try {
+            const remote = await fetchCloudRow();
+            if (remote.exists && Object.keys(remote.values).length > 0) {
+                Object.keys(remote.values).forEach(k => {
+                    if (!isSyncKey(k)) return;
+                    rawSet(k, remote.values[k]);
+                    syncBase[k] = remote.values[k];
+                });
+                localSyncKeys().forEach(k => { if (!(k in remote.values)) rawRemove(k); });   // old leftovers that are not in the cloud
+            }
+            syncRev = remote.rev;
+            hasSynced = true;
+        } catch (err) {
+            console.error('Supabase load error:', err);
+        }
     }
 
-    await supabaseClient
-      .from('mess_data')
-      .upsert({ id: 1, data: allLocalData });
-  } catch (err) {
-    console.error('Supabase save error:', err);
-  }
-}
-
-// --- Auto-Sync & Debounce Setup ---
-let syncTimer = null;
-
-function triggerAutoSave() {
-  clearTimeout(syncTimer);
-  syncTimer = setTimeout(() => {
-    saveToSupabase();
-  }, 500);
-}
-// --- Real-time Data Sync Listener ---
-supabaseClient
-  .channel('mess_data_changes')
-  .on(
-    'postgres_changes',
-    { event: '*', schema: 'public', table: 'mess_data' },
-    (payload) => {
-      if (payload.new && payload.new.data) {
-        const cloudData = payload.new.data;
-        Object.keys(cloudData).forEach((key) => {
-          localStorage.setItem(key, cloudData[key]);
+    // take over cloud values for every key this device has not changed itself
+    function applyRemoteValues(values) {
+        let changed = false;
+        Object.keys(values).forEach(k => {
+            if (!isSyncKey(k)) return;
+            const R = values[k];
+            const Lc = rawGet(k);
+            const clean = (Lc === (syncBase[k] === undefined ? null : syncBase[k]));
+            if (clean) {
+                if (Lc !== R) { rawSet(k, R); changed = true; }
+                syncBase[k] = R;
+            }
         });
-
-        // UI & Feedback সেকশন ইনস্ট্যান্ট আপডেট
-        if (typeof renderAll === 'function') renderAll();
-        if (typeof renderUI === 'function') renderUI();
-        if (typeof renderTab2 === 'function') renderTab2(); // <-- আসল ফিডব্যাক রেন্ডার ফাংশন
-        if (typeof renderObjections === 'function') renderObjections();
-      }
+        Object.keys(syncBase).forEach(k => {                 // removed in the cloud (for example Reset Data on another device)
+            if (!isSyncKey(k) || (k in values)) return;
+            if (rawGet(k) === syncBase[k]) { rawRemove(k); changed = true; }
+            delete syncBase[k];
+        });
+        return changed;
     }
-  )
-  .subscribe();
 
-function lsSet(key, val) {
-    localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val));
-    triggerAutoSave();
-}
+    async function pullFromCloud() {
+        let remote;
+        try { remote = await fetchCloudRow(); } catch (e) { console.error('Supabase load error:', e); return false; }
+        let changed = false;
+        if (!hasSynced && remote.exists && Object.keys(remote.values).length > 0) {
+            Object.keys(remote.values).forEach(k => { if (isSyncKey(k)) { rawSet(k, remote.values[k]); syncBase[k] = remote.values[k]; } });
+            localSyncKeys().forEach(k => { if (!(k in remote.values)) rawRemove(k); });
+            changed = true;
+        } else {
+            changed = applyRemoteValues(remote.values);
+        }
+        syncRev = remote.rev;
+        hasSynced = true;
+        if (changed && appReady) { reloadStateFromStorage(); scheduleRender(); }
+        return changed;
+    }
+
+    // 2. Data save: merge this device's changes into the newest cloud data
+    async function saveToSupabase() {
+        if (syncSaving) { syncPending = true; return; }
+        syncSaving = true;
+        let retryLater = false;
+        try {
+            let done = false;
+            for (let attempt = 0; attempt < 6 && !done; attempt++) {
+                let remote;
+                try { remote = await fetchCloudRow(); }
+                catch (e) { console.error('Supabase save error:', e); retryLater = true; return; }   // cannot merge safely: keep local data, try again later
+
+                if (!hasSynced && remote.exists && Object.keys(remote.values).length > 0) {         // first contact after a failed page load: the cloud wins
+                    Object.keys(remote.values).forEach(k => { if (isSyncKey(k)) { rawSet(k, remote.values[k]); syncBase[k] = remote.values[k]; } });
+                    localSyncKeys().forEach(k => { if (!(k in remote.values)) rawRemove(k); });
+                    syncRev = remote.rev; hasSynced = true;
+                    if (appReady) { reloadStateFromStorage(); scheduleRender(); }
+                    return;
+                }
+                hasSynced = true;
+
+                const snap = {};
+                localSyncKeys().forEach(k => { snap[k] = rawGet(k); });
+                const merged = Object.assign({}, remote.values);
+                let changed = false;
+
+                Object.keys(snap).forEach(k => {
+                    const Ls = snap[k], Bs = syncBase[k], Rs = remote.values[k];
+                    if (Ls === Bs) return;                                   // not changed on this device
+                    const m = mergeKeyValue(k, Bs, Ls, Rs);
+                    merged[k] = m;
+                    if (m !== Rs) changed = true;                            // (if equal, the cloud already has it: nothing to upload)
+                });
+                Object.keys(syncBase).forEach(k => {                         // removed on this device (for example Reset Data)
+                    if (k in snap || !(k in remote.values)) return;
+                    if (remote.values[k] === syncBase[k]) { delete merged[k]; changed = true; }
+                });
+
+                if (changed) {
+                    const res = await writeCloud(merged, remote);
+                    if (res === 'conflict') continue;                        // somebody saved at the same moment: merge again
+                    if (res !== 'ok') { retryLater = true; return; }
+                    syncRev = remote.rev + 1;
+                } else {
+                    syncRev = remote.rev;
+                }
+
+                // this device now holds exactly what the cloud holds (plus anything typed while the save was running)
+                let localChanged = false, needAnother = false;
+                Object.keys(merged).forEach(k => {
+                    const M = merged[k];
+                    const Lnow = rawGet(k);
+                    if (Lnow === null && snap[k] !== undefined) { syncBase[k] = M; return; }              // removed on this device while saving
+                    let target = M;
+                    if (Lnow !== null && Lnow !== snap[k]) target = mergeKeyValue(k, snap[k], Lnow, M);    // edited while saving: put it on top
+                    if (Lnow !== target) { rawSet(k, target); localChanged = true; }
+                    if (target !== M) needAnother = true;
+                    syncBase[k] = M;
+                });
+                Object.keys(syncBase).forEach(k => {
+                    if (k in merged) return;
+                    if (k in snap && rawGet(k) === snap[k] && snap[k] === syncBase[k]) { rawRemove(k); localChanged = true; }   // removed in the cloud
+                    delete syncBase[k];
+                });
+                if (localChanged && appReady) { reloadStateFromStorage(); scheduleRender(); }
+                if (needAnother) syncPending = true;
+                done = true;
+            }
+            if (!done) retryLater = true;
+        } finally {
+            syncSaving = false;
+            if (syncPending) { syncPending = false; triggerAutoSave(); }
+            else if (retryLater) setTimeout(triggerAutoSave, 3000);
+        }
+    }
+
+    // --- Auto-Sync & Debounce Setup ---
+    function triggerAutoSave() {
+        clearTimeout(syncTimer);
+        syncTimer = setTimeout(() => { saveToSupabase(); }, 300);
+    }
+
+    // --- Re-read everything from the browser storage into the page (after other admins changed something) ---
+    function reloadStateFromStorage() {
+        const parse = (k, fallback, check) => {
+            try { const v = JSON.parse(rawGet(k)); if (v !== null && v !== undefined && check(v)) return v; } catch (e) {}
+            return fallback;
+        };
+        const isArr = v => Array.isArray(v);
+        const isObj = v => isPlainObj(v);
+        state.members = parse('mess_members', state.members, isArr);
+        state.extraSectors = parse('mess_extra', {}, isObj);
+        state.extraLabels = parse('mess_extra_labels', {}, isObj);
+        state.meals = parse('mess_meals', {}, isObj);
+        state.menus = parse('mess_menus', {}, isObj);
+        state.bajar = parse('mess_bajar', [], isArr);
+        state.objections = parse('mess_objections', [], isArr);
+        loadAuditSettings();
+        const ae = document.activeElement;
+        if (!(ae && ae.closest && ae.closest('#notesList'))) loadNotes();   // do not touch a note that is being typed
+    }
+
+    // redraw the page, but wait while somebody is typing into a field that would be rebuilt
+    let renderTimer = null, renderTries = 0;
+    function scheduleRender() {
+        if (renderTimer) return;
+        const attempt = () => {
+            renderTimer = null;
+            const ae = document.activeElement;
+            const typing = !!(ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) && ae.closest && ae.closest('#tab3, #tab4'));
+            if (typing && renderTries < 25) { renderTries++; renderTimer = setTimeout(attempt, 800); return; }
+            renderTries = 0;
+            try { renderAll(); } catch (e) { console.error('Render error:', e); }
+        };
+        renderTimer = setTimeout(attempt, 50);
+    }
+
+    // --- Real-time Data Sync Listener ---
+    function onCloudChange(payload) {
+        if (!appReady) return;
+        const raw = payload && payload.new && payload.new.data;
+        if (raw && typeof raw === 'object') {
+            const values = {};
+            Object.keys(raw).forEach(k => { if (k.charAt(0) !== '_') values[k] = (typeof raw[k] === 'string') ? raw[k] : JSON.stringify(raw[k]); });
+            const changed = applyRemoteValues(values);
+            syncRev = Number(raw._rev) || syncRev;
+            if (changed) { reloadStateFromStorage(); scheduleRender(); }
+        } else {
+            pullFromCloud();                                  // big rows can arrive without their data: fetch it instead
+        }
+    }
+
+    supabaseClient
+      .channel('mess_data_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: SYNC_TABLE }, onCloudChange)
+      .subscribe();
+
+    // Safety net in case Realtime is not switched on for the table: look for changes now and then (cheap revision check)
+    let pollTick = 0;
+    async function pullIfChanged() {
+        if (!appReady || syncSaving) return;
+        try {
+            const { data, error } = await supabaseClient.from(SYNC_TABLE).select('rev:data->>_rev').eq('id', 1).maybeSingle();
+            if (!error) { if (data && (Number(data.rev) || 0) === syncRev && hasSynced) return; }
+            else { pollTick++; if (pollTick % 3 !== 0) return; }   // revision lookup not available: do a full pull only every 3rd time
+        } catch (e) { return; }
+        await pullFromCloud();
+    }
+    setInterval(() => { if (document.visibilityState === 'visible') pullIfChanged(); }, 20000);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') pullIfChanged(); });
+
+    function lsSet(key, val) {
+        try {
+            localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val));
+            triggerAutoSave();   // cloud auto-save (merged with what other admins saved)
+        } catch (e) {}
+    }
+
         const DEFAULT_MEMBERS = [
             { id: 'n1', name: 'Fahim Islam Rahat', room: '-', avatar: '', deposit: 0, absentDays: 0 },
             { id: 'n2', name: 'Md Mehedi Hasan', room: '-', avatar: '', deposit: 0, absentDays: 0 },
@@ -1061,12 +1352,6 @@ function lsSet(key, val) {
 
         // Safe storage wrappers (storage may be unavailable)
         function lsGet(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
-        function lsSet(key, val) { 
-    try { 
-        localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val)); 
-        saveToSupabase(); // ক্লাউডে অটো-সেভ হবে
-    } catch (e) {} 
-}
         function lsClear() { try { localStorage.clear(); } catch (e) {} }
 
         // Inline SVG placeholder avatar (no remote images)
@@ -1413,10 +1698,11 @@ function lsSet(key, val) {
             let totalBajar = state.bajar.reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
             let totalMeals = 0;
+            const liveMemberIds = new Set(state.members.map(m => m.id));
             Object.values(state.meals).forEach(dateObj => {
                 if (dateObj && typeof dateObj === 'object') {
-                    Object.values(dateObj).forEach(val => {
-                        totalMeals += Number(val || 0);
+                    Object.keys(dateObj).forEach(memberId => {
+                        if (liveMemberIds.has(memberId)) totalMeals += Number(dateObj[memberId] || 0);
                     });
                 }
             });
@@ -1487,7 +1773,7 @@ function lsSet(key, val) {
                 card.className = "bg-slate-800/90 border border-slate-700/80 rounded-2xl p-4 shadow-lg hover:border-slate-600 transition-all flex flex-col justify-between space-y-3";
 
                 const isAdmin = state.currentRole === 'admin';
-                const canEditMember = isAdmin && isActive;
+                const canEditMember = isAdmin && isActive;   // meals can only be changed once the member has activated the profile
                 const buttonStateClass = canEditMember
                     ? "bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer shadow-md active:scale-95"
                     : "bg-slate-700/50 text-slate-500 cursor-not-allowed opacity-50";
@@ -1518,7 +1804,7 @@ function lsSet(key, val) {
                         </div>
                         <input type="file" id="upload-${member.id}" class="hidden" accept="image/*" onchange="handlePhotoUpload(event, '${member.id}')">
 
-                        ${isAdmin ? `<div class="flex items-center gap-1"><button onclick="openEditMemberModal('${member.id}')" ${isActive ? '' : 'disabled'} title="${isActive ? 'Edit Profile' : 'Locked until the member activates the profile'}" class="p-1 transition-colors ${isActive ? 'text-slate-500 hover:text-indigo-400' : 'text-slate-600 opacity-40 cursor-not-allowed'}"><i class="fa-solid fa-user-pen text-xs"></i></button><button onclick="openDeleteMemberModal('${member.id}')" title="Delete Member" class="text-slate-500 hover:text-rose-400 p-1 transition-colors"><i class="fa-solid fa-user-minus text-xs"></i></button></div>` : ''}
+                        ${isAdmin ? `<div class="flex items-center gap-1"><button onclick="openEditMemberModal('${member.id}')" title="Edit Profile" class="p-1 transition-colors text-slate-500 hover:text-indigo-400"><i class="fa-solid fa-user-pen text-xs"></i></button><button onclick="openDeleteMemberModal('${member.id}')" title="Delete Member" class="text-slate-500 hover:text-rose-400 p-1 transition-colors"><i class="fa-solid fa-user-minus text-xs"></i></button></div>` : ''}
                     </div>
 
                     <div class="bg-slate-900/90 p-3.5 rounded-2xl border border-slate-700/60 flex items-center justify-between">
@@ -1537,14 +1823,13 @@ function lsSet(key, val) {
                         </div>
                     </div>
 
+                    ${(isAdmin && !isActive) ? `<p class="text-[10px] text-amber-400/80 flex items-center gap-1"><i class="fa-solid fa-lock"></i> Meal is locked until ${escapeHtml(member.name)} activates the profile.</p>` : ''}
+
                     ${isAdmin ? `
                     <div class="flex items-center justify-between text-xs text-slate-400 pt-1 border-t border-slate-700/50">
                         <span>Deposit: <strong class="text-emerald-400 font-bold">৳ ${member.deposit}</strong></span>
-                        ${isActive
-                            ? `<button onclick="openDepositModal('${member.id}')" class="text-indigo-400 hover:underline text-[11px] font-bold">Edit Deposit</button>`
-                            : `<span class="text-slate-500 text-[11px] font-bold flex items-center gap-1" title="Locked until the member activates the profile"><i class="fa-solid fa-lock text-[10px]"></i> Locked</span>`}
-                    </div>
-                    ${isActive ? '' : `<p class="text-[10px] text-amber-400/80">Meal and deposit are locked until ${escapeHtml(member.name)} activates the profile.</p>`}` : ''}
+                        <button onclick="openDepositModal('${member.id}')" class="text-indigo-400 hover:underline text-[11px] font-bold">Edit Deposit</button>
+                    </div>` : ''}
 
                     ${(!isAdmin && isThisDevice) ? `
                     <div class="flex items-center justify-between text-xs text-slate-400 pt-1 border-t border-slate-700/50">
@@ -1592,6 +1877,10 @@ function lsSet(key, val) {
         // A profile photo can only be changed with the member's own Unique ID + 4 digit password.
         // The device locked to that member is trusted (same rule as feedback); any other device must enter ID + password.
         function triggerPhotoUpload(memberId) {
+            if (state.currentRole === 'admin') {   // Admin Mode (7 digit password) can change any photo
+                document.getElementById(`upload-${memberId}`).click();
+                return;
+            }
             if (!isMemberActive(memberId)) {
                 showToast("Activate this profile first. A photo can only be changed with the member's Unique ID + password.", "fa-lock");
                 return;
@@ -1609,7 +1898,7 @@ function lsSet(key, val) {
             const file = input.files && input.files[0];
             if (!file) return;
             const linked = getLinkedMember();
-            if (!linked || linked.id !== memberId) {
+            if (state.currentRole !== 'admin' && (!linked || linked.id !== memberId)) {
                 input.value = '';
                 showToast("Unique ID + password required to change this photo.", "fa-lock");
                 return;
@@ -1656,6 +1945,7 @@ function lsSet(key, val) {
                     member.avatar = dataUrl;
                     try {
                         localStorage.setItem('mess_members', JSON.stringify(state.members));
+                        triggerAutoSave();
                     } catch (err) {
                         member.avatar = previous;
                         showToast("Could not save the picture (browser storage is full).", "fa-circle-exclamation");
@@ -2035,15 +2325,9 @@ function lsSet(key, val) {
             else if (msg) showToast(msg, "fa-circle-exclamation");
         }
 
-        // Fetch only the given keys from the cloud copy (leaves all other local data untouched)
+        // Take over the newest cloud data (never touches anything this device has changed but not saved yet)
         async function refreshKeysFromCloud(keys) {
-            try {
-                const { data, error } = await supabaseClient.from('mess_data').select('data').eq('id', 1).maybeSingle();
-                if (error || !data || !data.data) return;
-                keys.forEach(k => {
-                    if (typeof data.data[k] === 'string') { try { localStorage.setItem(k, data.data[k]); } catch (e) {} }
-                });
-            } catch (e) {}
+            await pullFromCloud();
         }
 
         // Pull the newest members / password hashes / comments from the cloud before checking or posting
@@ -2118,7 +2402,7 @@ function lsSet(key, val) {
 
                 state.objections.unshift(newObj);
                 saveObjectionsData();
-                triggerAutoSave();
+                document.getElementById('commentTextInput').value = '';
                 const pinBox = document.getElementById('commentPinInput');
                 if (pinBox) pinBox.value = '';
                 renderTab2();
@@ -2132,8 +2416,8 @@ function lsSet(key, val) {
         function deleteObjection(id) {
             state.objections = state.objections.filter(o => o.id !== id);
             saveObjectionsData();
-            triggerAutoSave();
             renderTab2();
+            showToast("Objection deleted.", "fa-trash");
         }
 
         function renderMealMatrix() {
@@ -2708,7 +2992,6 @@ function lsSet(key, val) {
 
         function updateMemberDeposit(memberId, val) {
             if (state.currentRole !== 'admin') return;
-            if (!isMemberActive(memberId)) { warnMemberNotActive(memberId); renderAuditLedger(); return; }
             const member = state.members.find(m => m.id === memberId);
             if (member) {
                 member.deposit = Math.max(0, parseFloat(val) || 0);
@@ -2814,15 +3097,13 @@ function lsSet(key, val) {
                     ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 whitespace-nowrap">&#10003; Passed (+' + fmtNum(r.diff) + ')</span>'
                     : '<span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-500/20 text-rose-400 border border-rose-500/30 whitespace-nowrap">&#10007; Deficit (-' + fmtNum(Math.abs(r.diff)) + ')</span>';
 
-                const memberActive = isMemberActive(member.id);
-                const lockedHint = '<i class="fa-solid fa-lock text-[9px] text-slate-500 ml-1" title="Locked until the member activates the profile"></i>';
-                const absentCell = (isAdmin && memberActive)
+                const absentCell = isAdmin
                     ? '<input type="number" min="0" max="' + cycleDays + '" value="' + r.absentDays + '" onchange="updateMemberAbsentDays(\'' + member.id + '\', this.value)" class="w-14 bg-slate-900 border border-slate-700 text-center rounded-lg text-xs py-1 text-amber-400 font-black">'
-                    : '<span class="font-black text-amber-400">' + r.absentDays + '</span>' + (isAdmin ? lockedHint : '');
+                    : '<span class="font-black text-amber-400">' + r.absentDays + '</span>';
 
-                const depositCell = (isAdmin && memberActive)
+                const depositCell = isAdmin
                     ? '<input type="number" min="0" step="100" value="' + deposit + '" onchange="updateMemberDeposit(\'' + member.id + '\', this.value)" class="w-24 bg-slate-900 border border-slate-700 text-right rounded-lg text-xs py-1 px-2 text-emerald-400 font-bold">'
-                    : '<span class="font-bold text-emerald-400">৳ ' + deposit.toFixed(2) + '</span>' + (isAdmin ? lockedHint : '');
+                    : '<span class="font-bold text-emerald-400">৳ ' + deposit.toFixed(2) + '</span>';
 
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-slate-800/50";
@@ -3031,7 +3312,7 @@ function lsSet(key, val) {
         }
 
         function updateMemberAbsentDays(memberId, val) {
-            if (!isMemberActive(memberId)) { warnMemberNotActive(memberId); renderAuditLedger(); return; }
+            if (state.currentRole !== 'admin') return;
             const member = state.members.find(m => m.id === memberId);
             if (member) {
                 member.absentDays = Math.max(0, parseInt(val) || 0);
@@ -3404,7 +3685,6 @@ function lsSet(key, val) {
             if (state.currentRole !== 'admin') return;
             const m = state.members.find(x => x.id === memberId);
             if (!m) return;
-            if (!readMemberPins()[m.id]) { showToast("Locked until " + m.name + " activates the profile.", "fa-lock"); return; }
             document.getElementById('editMemberId').value = m.id;
             document.getElementById('editMemberNameInput').value = m.name || '';
             document.getElementById('editMemberRoomInput').value = m.room || '';
@@ -3448,7 +3728,6 @@ function lsSet(key, val) {
             const id = document.getElementById('editMemberId').value;
             const m = state.members.find(x => x.id === id);
             if (!m) return;
-            if (!readMemberPins()[m.id]) { closeEditMemberModal(); return; }
             const errEl = document.getElementById('editMemberError');
             const name = document.getElementById('editMemberNameInput').value.trim();
             const room = document.getElementById('editMemberRoomInput').value.trim();
@@ -3487,6 +3766,14 @@ function lsSet(key, val) {
             if (member) {
                 state.members = state.members.filter(m => m.id !== memberId);
                 saveMembers();
+                Object.keys(state.meals).forEach(d => {          // the deleted member's meals must not stay in any total
+                    const dayObj = state.meals[d];
+                    if (dayObj && typeof dayObj === 'object' && Object.prototype.hasOwnProperty.call(dayObj, memberId)) {
+                        delete dayObj[memberId];
+                        if (Object.keys(dayObj).length === 0) delete state.meals[d];
+                    }
+                });
+                saveMeals();
                 refreshKeysFromCloud(['mess_member_pins']).then(() => {
                     const pinsAfterDelete = readMemberPins();
                     if (pinsAfterDelete[memberId]) { delete pinsAfterDelete[memberId]; writeMemberPins(pinsAfterDelete); }
@@ -3498,9 +3785,9 @@ function lsSet(key, val) {
         }
 
         function openDepositModal(memberId) {
+            if (state.currentRole !== 'admin') return;
             const member = state.members.find(m => m.id === memberId);
             if (!member) return;
-            if (!isMemberActive(memberId)) { warnMemberNotActive(memberId); return; }
             document.getElementById('depositMemberId').value = member.id;
             document.getElementById('depositModalMemberName').innerText = `Update Deposit: ${member.name}`;
             document.getElementById('depositAmountInput').value = member.deposit;
@@ -3514,8 +3801,8 @@ function lsSet(key, val) {
         function saveDepositModal() {
             const memberId = document.getElementById('depositMemberId').value;
             const amount = parseFloat(document.getElementById('depositAmountInput').value) || 0;
+            if (state.currentRole !== 'admin') return;
             const member = state.members.find(m => m.id === memberId);
-            if (member && !isMemberActive(memberId)) { closeDepositModal(); warnMemberNotActive(memberId); return; }
             if (member) {
                 member.deposit = amount;
                 saveMembers();
@@ -3645,9 +3932,10 @@ function lsSet(key, val) {
     loadAuditSettings();
     loadNotes();
     initNavScroll();
-    window.addEventListener('pagehide', () => { if (notesSaveTimer) saveNotesNow(); });
+    window.addEventListener('pagehide', () => { if (noteSaveTimer) saveNotesNow(); });
     startLiveClock();
     renderAll();
+    appReady = true;
 };
     </script>
 </body>
